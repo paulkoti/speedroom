@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
+const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = false, isCompact = false }) => {
   const videoRef = useRef();
   const [streamAssigned, setStreamAssigned] = useState(false);
   const [isScreenShare, setIsScreenShare] = useState(false);
@@ -90,9 +90,10 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
         playsInline
         className={`w-full ${videoHeight || 'h-64'} bg-gray-800 rounded-xl ${isScreenShare ? 'object-contain' : 'object-cover'} shadow-lg transition-all duration-300 group-hover:shadow-xl`}
       />
-      <div className="absolute top-3 left-3 bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-full text-xs md:text-sm font-medium shadow-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+      <div className={`absolute ${isCompact ? 'top-2 left-2' : 'top-3 left-3'} bg-gradient-to-r from-green-600 to-blue-600 text-white px-2 py-1 rounded-full ${isCompact ? 'text-xs' : 'text-xs md:text-sm'} font-medium shadow-lg`}>
+        <div className="flex items-center gap-1">
+          <div className={`${isCompact ? 'w-1.5 h-1.5' : 'w-2 h-2'} bg-green-400 rounded-full animate-pulse`}></div>
+          {isSpeaker && <span className="text-yellow-200">👑 </span>}
           {peer?.userName || peerId.slice(-6)}
         </div>
       </div>

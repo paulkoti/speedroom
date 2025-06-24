@@ -11,9 +11,11 @@ import {
 } from '../utils/roomUtils';
 import ControlPanel from './ControlPanel';
 import VideoGrid from './VideoGrid';
+import VideoGridAdvanced from './VideoGridAdvanced';
 import NameModal from './NameModal';
 import MaximizedVideoModal from './MaximizedVideoModal';
 import Chat from './Chat';
+import LayoutSelector from './LayoutSelector';
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
@@ -34,6 +36,11 @@ const VideoCall = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [layout, setLayout] = useState('grid');
+  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
+  const [speakerUserId, setSpeakerUserId] = useState(null);
+  const [isPiPEnabled, setIsPiPEnabled] = useState(false);
+  const [pipVideo, setPipVideo] = useState(null);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
@@ -75,6 +82,37 @@ const VideoCall = () => {
       cleanupConnections();
     };
   }, [isConnected, socket, showNameModal]);
+
+  // Load saved layout preference
+  useEffect(() => {
+    const savedLayout = localStorage.getItem('speedroom-layout');
+    if (savedLayout && ['grid', 'speaker', 'sidebar', 'theater'].includes(savedLayout)) {
+      setLayout(savedLayout);
+    }
+  }, []);
+
+  // PiP event listeners
+  useEffect(() => {
+    if (!localVideoRef.current) return;
+
+    const handlePiPEnter = () => {
+      setIsPiPEnabled(true);
+    };
+
+    const handlePiPLeave = () => {
+      setIsPiPEnabled(false);
+      setPipVideo(null);
+    };
+
+    const video = localVideoRef.current;
+    video.addEventListener('enterpictureinpicture', handlePiPEnter);
+    video.addEventListener('leavepictureinpicture', handlePiPLeave);
+
+    return () => {
+      video.removeEventListener('enterpictureinpicture', handlePiPEnter);
+      video.removeEventListener('leavepictureinpicture', handlePiPLeave);
+    };
+  }, [localVideoRef.current]);
 
   const initializeMedia = async () => {
     try {
@@ -452,6 +490,45 @@ const VideoCall = () => {
     }
   };
 
+  const handleLayoutChange = (newLayout) => {
+    setLayout(newLayout);
+    
+    // Auto-set speaker for presentation mode
+    if (newLayout === 'speaker' && !speakerUserId) {
+      setSpeakerUserId('local');
+    }
+    
+    // Store layout preference
+    localStorage.setItem('speedroom-layout', newLayout);
+  };
+
+  const togglePiP = async () => {
+    if (!localVideoRef.current) return;
+
+    try {
+      if (isPiPEnabled) {
+        // Exit PiP
+        await document.exitPictureInPicture();
+      } else {
+        // Enter PiP
+        if (localVideoRef.current.requestPictureInPicture) {
+          const pipWindow = await localVideoRef.current.requestPictureInPicture();
+          setPipVideo(pipWindow);
+          setIsPiPEnabled(true);
+        }
+      }
+    } catch (error) {
+      console.error('Erro no Picture-in-Picture:', error);
+    }
+  };
+
+  const setSpeaker = (userId) => {
+    setSpeakerUserId(userId);
+    if (layout !== 'speaker') {
+      setLayout('speaker');
+    }
+  };
+
   const handleCopyUrl = async () => {
     const success = await copyRoomUrl();
     if (success) {
@@ -536,6 +613,26 @@ const VideoCall = () => {
                 </button>
                 
                 <button
+                  onClick={() => setShowLayoutSelector(true)}
+                  className="px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 bg-gray-700/80 hover:bg-gray-600/80 text-gray-300 hover:text-white"
+                  title="Alterar layout"
+                >
+                  📐 Layout
+                </button>
+
+                <button
+                  onClick={togglePiP}
+                  className={`px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 ${
+                    isPiPEnabled 
+                      ? 'bg-purple-600/90 hover:bg-purple-500/90 text-white' 
+                      : 'bg-gray-700/80 hover:bg-gray-600/80 text-gray-300 hover:text-white'
+                  }`}
+                  title={isPiPEnabled ? 'Sair do PiP' : 'Picture-in-Picture'}
+                >
+                  {isPiPEnabled ? '🔳' : '📱'} PiP
+                </button>
+
+                <button
                   onClick={handleCopyUrl}
                   className={`px-3 md:px-4 py-2 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 ${
                     isCopied 
@@ -551,30 +648,48 @@ const VideoCall = () => {
         </header>
 
         {/* Main content */}
-        <main className="flex-1">
-          <VideoGrid 
+        <main className={`flex-1 ${layout === 'theater' ? 'fixed inset-0 z-50' : ''}`}>
+          <VideoGridAdvanced 
             localVideoRef={localVideoRef}
             peers={peers}
             isVideoEnabled={isVideoEnabled}
             isScreenSharing={isScreenSharing}
             userName={userName}
             onMaximizeVideo={setMaximizedVideo}
+            layout={layout}
+            speakerUserId={speakerUserId}
+            isTheaterMode={layout === 'theater'}
           />
         </main>
 
-        {/* Controls */}
-        <ControlPanel
-          isAudioEnabled={isAudioEnabled}
-          isVideoEnabled={isVideoEnabled}
-          isScreenSharing={isScreenSharing}
-          onToggleAudio={toggleAudio}
-          onToggleVideo={toggleVideo}
-          onToggleScreenShare={toggleScreenShare}
-          onToggleChat={toggleChat}
-          isChatOpen={isChatOpen}
-          unreadMessages={unreadMessages}
-          onLeaveRoom={handleLeaveRoom}
-        />
+        {/* Controls - Hidden in theater mode */}
+        {layout !== 'theater' && (
+          <ControlPanel
+            isAudioEnabled={isAudioEnabled}
+            isVideoEnabled={isVideoEnabled}
+            isScreenSharing={isScreenSharing}
+            onToggleAudio={toggleAudio}
+            onToggleVideo={toggleVideo}
+            onToggleScreenShare={toggleScreenShare}
+            onToggleChat={toggleChat}
+            isChatOpen={isChatOpen}
+            unreadMessages={unreadMessages}
+            onLeaveRoom={handleLeaveRoom}
+          />
+        )}
+
+        {/* Theater Mode Exit Button */}
+        {layout === 'theater' && (
+          <button
+            onClick={() => setLayout('grid')}
+            className="fixed top-4 right-4 z-60 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200 transform hover:scale-105"
+            title="Sair do modo teatro"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
 
         {/* Name Modal */}
         <NameModal 
@@ -648,9 +763,17 @@ const VideoCall = () => {
           </div>
         )}
 
+        {/* Layout Selector */}
+        <LayoutSelector
+          currentLayout={layout}
+          onLayoutChange={handleLayoutChange}
+          isOpen={showLayoutSelector}
+          onClose={() => setShowLayoutSelector(false)}
+        />
+
         {/* Chat */}
         <Chat
-          isOpen={isChatOpen}
+          isOpen={isChatOpen && layout !== 'theater'}
           onClose={() => setIsChatOpen(false)}
           messages={messages}
           onSendMessage={handleSendMessage}
