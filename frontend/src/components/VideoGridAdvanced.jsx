@@ -52,7 +52,7 @@ const VideoGridAdvanced = ({
                 })}
               >
                 <video
-                  ref={layout === 'speaker' ? localVideoRef : null}
+                  ref={localVideoRef}
                   autoPlay
                   muted
                   playsInline
@@ -116,6 +116,16 @@ const VideoGridAdvanced = ({
                       {userName || 'Você'}
                     </div>
                   </div>
+                  {!isVideoEnabled && (
+                    <div className="absolute inset-0 bg-gray-900 bg-opacity-75 rounded-lg flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <svg className="w-8 h-8 mx-auto mb-2 opacity-60" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A2 2 0 0018 13V7a1 1 0 00-1.447-.894l-2 1A1 1 0 0014 8v4.586l-3-3V6a2 2 0 00-2-2H5.414l-1.707-1.707zM4 6.414L2.586 5A2 2 0 002 6v6a2 2 0 002 2h6a2 2 0 002-2v-.586L10.586 10H4V6.414z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-xs opacity-75">Câmera desligada</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -147,7 +157,7 @@ const VideoGridAdvanced = ({
           userName: userName || 'Você'
         })}>
           <video
-            ref={layout === 'sidebar' ? localVideoRef : null}
+            ref={localVideoRef}
             autoPlay
             muted
             playsInline
@@ -199,7 +209,7 @@ const VideoGridAdvanced = ({
     <div className="fixed inset-0 bg-black z-40 flex items-center justify-center">
       <div className="relative w-full h-full flex items-center justify-center">
         <video
-          ref={layout === 'theater' ? localVideoRef : null}
+          ref={localVideoRef}
           autoPlay
           muted
           playsInline
@@ -266,7 +276,7 @@ const VideoGridAdvanced = ({
           userName: userName || 'Você'
         })}>
           <video
-            ref={layout === 'grid' ? localVideoRef : null}
+            ref={localVideoRef}
             autoPlay
             muted
             playsInline

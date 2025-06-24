@@ -114,6 +114,41 @@ const VideoCall = () => {
     };
   }, [localVideoRef.current]);
 
+  // Reatribuir srcObject quando o layout mudar
+  useEffect(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [layout]);
+
+  // Sincronizar srcObject sempre que o stream mudar
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localStreamRef.current = localStream;
+    }
+  }, [localStream]);
+
+  // Garantir sincronização em mudanças de ref ou stream
+  useEffect(() => {
+    const syncVideo = () => {
+      if (localVideoRef.current && localStreamRef.current) {
+        if (localVideoRef.current.srcObject !== localStreamRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+          console.log('Video srcObject sincronizado:', layout);
+        }
+      }
+    };
+
+    // Sincronizar imediatamente
+    syncVideo();
+
+    // Adicionar um pequeno delay para garantir que as mudanças de DOM foram aplicadas
+    const timeoutId = setTimeout(syncVideo, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [layout, localStream]);
+
   const initializeMedia = async () => {
     try {
       let stream;
