@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
+import { debounceDOMOperation } from '../utils/debounce';
 
-const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = false, isCompact = false }) => {
+const VideoTile = memo(({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = false, isCompact = false }) => {
   const videoRef = useRef();
   const [streamAssigned, setStreamAssigned] = useState(false);
   const [isScreenShare, setIsScreenShare] = useState(false);
@@ -13,7 +14,7 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = fal
     }
   }, [peer, peerId]);
 
-  // Stream assignment handler
+  // Stream assignment handler with debounced retries
   useEffect(() => {
     if (!peer || !videoRef.current) return;
 
@@ -63,13 +64,14 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = fal
     // Try immediately
     assignStream();
 
-    // Set up retry mechanism only if not assigned
+    // Set up debounced retry mechanism only if not assigned
     if (!streamAssigned) {
-      const intervals = [100, 300, 600, 1000, 1500];
-      const timeouts = intervals.map((delay, index) => 
+      const debouncedRetry = debounceDOMOperation(assignStream, 150);
+      const intervals = [100, 300, 600, 1000];
+      const timeouts = intervals.map((delay) => 
         setTimeout(() => {
           if (!streamAssigned) {
-            assignStream();
+            debouncedRetry();
           }
         }, delay)
       );
@@ -116,6 +118,8 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo, isSpeaker = fal
       )}
     </div>
   );
-};
+});
+
+VideoTile.displayName = 'VideoTile';
 
 export default VideoTile;

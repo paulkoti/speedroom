@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { memo } from 'react';
 import VideoTile from './VideoTile';
 
-const VideoGridAdvanced = ({ 
+const VideoGridAdvanced = memo(({ 
   localVideoRef, 
   peers, 
   isVideoEnabled, 
@@ -10,7 +10,6 @@ const VideoGridAdvanced = ({
   onMaximizeVideo,
   layout = 'grid',
   speakerUserId = null,
-  isTheaterMode = false,
   onLayoutChange
 }) => {
   const totalParticipants = 1 + peers.size;
@@ -341,6 +340,8 @@ const VideoGridAdvanced = ({
       {layoutContent}
     </div>
   );
-};
+});
+
+VideoGridAdvanced.displayName = 'VideoGridAdvanced';
 
 export default VideoGridAdvanced;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { WebRTCConnection } from '../utils/webrtc';
 import { createFakeVideoStream } from '../utils/fakeVideo';
@@ -9,14 +9,16 @@ import {
   generateUserId,
   copyRoomUrl 
 } from '../utils/roomUtils';
+import { debounceDOMOperation } from '../utils/debounce';
 import ControlPanel from './ControlPanel';
-import VideoGrid from './VideoGrid';
 import VideoGridAdvanced from './VideoGridAdvanced';
 import NameModal from './NameModal';
-import MaximizedVideoModal from './MaximizedVideoModal';
-import Chat from './Chat';
-import LayoutSelector from './LayoutSelector';
-import ParticipantsList from './ParticipantsList';
+
+// Lazy load components that are not immediately needed
+const MaximizedVideoModal = lazy(() => import('./MaximizedVideoModal'));
+const Chat = lazy(() => import('./Chat'));
+const LayoutSelector = lazy(() => import('./LayoutSelector'));
+const ParticipantsList = lazy(() => import('./ParticipantsList'));
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
@@ -41,7 +43,6 @@ const VideoCall = () => {
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [speakerUserId, setSpeakerUserId] = useState(null);
   const [isPiPEnabled, setIsPiPEnabled] = useState(false);
-  const [pipVideo, setPipVideo] = useState(null);
   const [showParticipantsList, setShowParticipantsList] = useState(false);
   const [roomError, setRoomError] = useState('');
   
@@ -49,7 +50,7 @@ const VideoCall = () => {
   const localStreamRef = useRef(null);
   const peersRef = useRef(new Map());
 
-  const handleEnterRoom = async (name, password = '') => {
+  const handleEnterRoom = useCallback(async (name, password = '') => {
     setRoomError('');
     setUserName(name);
     
@@ -68,9 +69,9 @@ const VideoCall = () => {
     
     // Tentar entrar na sala
     socket.emit('join-room', currentRoomId, currentUserId, name, password);
-  };
+  }, [socket]);
 
-  const handleCreateRoom = async (name, password = '') => {
+  const handleCreateRoom = useCallback(async (name, password = '') => {
     setRoomError('');
     setUserName(name);
     
@@ -85,7 +86,7 @@ const VideoCall = () => {
     
     // Criar nova sala
     socket.emit('create-room', newRoomId, currentUserId, name, password);
-  };
+  }, [socket]);
 
   useEffect(() => {
     if (!isConnected || !socket || showNameModal) return;
@@ -113,7 +114,6 @@ const VideoCall = () => {
 
     const handlePiPLeave = () => {
       setIsPiPEnabled(false);
-      setPipVideo(null);
     };
 
     const video = localVideoRef.current;
@@ -126,40 +126,34 @@ const VideoCall = () => {
     };
   }, [localVideoRef.current]);
 
-  // Reatribuir srcObject quando o layout mudar
-  useEffect(() => {
-    if (localVideoRef.current && localStreamRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-    }
-  }, [layout]);
-
-  // Sincronizar srcObject sempre que o stream mudar
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-      localStreamRef.current = localStream;
-    }
-  }, [localStream]);
-
-  // Garantir sincronização em mudanças de ref ou stream
-  useEffect(() => {
-    const syncVideo = () => {
-      if (localVideoRef.current && localStreamRef.current) {
-        if (localVideoRef.current.srcObject !== localStreamRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
-          console.log('Video srcObject sincronizado:', layout);
+  // Create debounced sync function
+  const debouncedVideoSync = useCallback(
+    debounceDOMOperation(() => {
+      if (localVideoRef.current && localStream) {
+        const currentSrcObject = localVideoRef.current.srcObject;
+        if (currentSrcObject !== localStream) {
+          localVideoRef.current.srcObject = localStream;
+          localStreamRef.current = localStream;
         }
       }
-    };
+    }, 100),
+    [localStream]
+  );
 
-    // Sincronizar imediatamente
-    syncVideo();
+  // Unified video synchronization effect
+  useEffect(() => {
+    // Sync immediately for critical changes
+    if (localVideoRef.current && localStream) {
+      const currentSrcObject = localVideoRef.current.srcObject;
+      if (currentSrcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+        localStreamRef.current = localStream;
+      }
+    }
 
-    // Adicionar um pequeno delay para garantir que as mudanças de DOM foram aplicadas
-    const timeoutId = setTimeout(syncVideo, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [layout, localStream]);
+    // Debounced sync for layout changes
+    debouncedVideoSync();
+  }, [localStream, layout, debouncedVideoSync]);
 
   const initializeMedia = async () => {
     try {
@@ -345,7 +339,7 @@ const VideoCall = () => {
     }
   };
 
-  const toggleAudio = () => {
+  const toggleAudio = useCallback(() => {
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
       if (audioTrack) {
@@ -353,9 +347,9 @@ const VideoCall = () => {
         setIsAudioEnabled(audioTrack.enabled);
       }
     }
-  };
+  }, [localStream]);
 
-  const toggleVideo = () => {
+  const toggleVideo = useCallback(() => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
@@ -363,7 +357,7 @@ const VideoCall = () => {
         setIsVideoEnabled(videoTrack.enabled);
       }
     }
-  };
+  }, [localStream]);
 
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
@@ -521,34 +515,37 @@ const VideoCall = () => {
     }
   };
 
-  const enableAudio = async () => {
-    try {
-      // Criar um contexto de áudio e reproduzir um som silencioso
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      await audioContext.resume();
-      
-      // Tentar reproduzir todos os vídeos remotos (exceto o local que é muted)
-      const videos = document.querySelectorAll('video');
-      const promises = Array.from(videos).map(video => {
-        // Só tentar reproduzir vídeos que não são o local (que deve permanecer muted)
-        if (video !== localVideoRef.current) {
-          return video.play().catch(() => {
-            // Ignorar erros - alguns vídeos podem não ter stream ainda
-          });
-        }
-        return Promise.resolve();
-      });
-      
-      await Promise.allSettled(promises);
-      setShowAudioWarning(false);
-      
-      console.log('Áudio habilitado com sucesso');
-    } catch (error) {
-      console.error('Erro ao habilitar áudio:', error);
-    }
-  };
+  const enableAudio = useCallback(
+    debounceDOMOperation(async () => {
+      try {
+        // Criar um contexto de áudio e reproduzir um som silencioso
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        await audioContext.resume();
+        
+        // Tentar reproduzir todos os vídeos remotos (exceto o local que é muted)
+        const videos = document.querySelectorAll('video');
+        const promises = Array.from(videos).map(video => {
+          // Só tentar reproduzir vídeos que não são o local (que deve permanecer muted)
+          if (video !== localVideoRef.current) {
+            return video.play().catch(() => {
+              // Ignorar erros - alguns vídeos podem não ter stream ainda
+            });
+          }
+          return Promise.resolve();
+        });
+        
+        await Promise.allSettled(promises);
+        setShowAudioWarning(false);
+        
+        console.log('Áudio habilitado com sucesso');
+      } catch (error) {
+        console.error('Erro ao habilitar áudio:', error);
+      }
+    }, 200),
+    []
+  );
 
-  const handleSendMessage = (messageText) => {
+  const handleSendMessage = useCallback((messageText) => {
     const message = {
       id: Date.now(),
       message: messageText,
@@ -562,16 +559,16 @@ const VideoCall = () => {
     
     // Enviar via socket
     socket.emit('chat-message', message, roomId);
-  };
+  }, [userName, userId, socket, roomId]);
 
-  const toggleChat = () => {
+  const toggleChat = useCallback(() => {
     setIsChatOpen(!isChatOpen);
     if (!isChatOpen) {
       setUnreadMessages(0);
     }
-  };
+  }, [isChatOpen]);
 
-  const handleLayoutChange = (newLayout) => {
+  const handleLayoutChange = useCallback((newLayout) => {
     setLayout(newLayout);
     
     // Auto-set speaker for presentation mode
@@ -581,7 +578,7 @@ const VideoCall = () => {
     
     // Store layout preference
     localStorage.setItem('speedroom-layout', newLayout);
-  };
+  }, [speakerUserId]);
 
   const togglePiP = async () => {
     if (!localVideoRef.current) return;
@@ -593,8 +590,7 @@ const VideoCall = () => {
       } else {
         // Enter PiP
         if (localVideoRef.current.requestPictureInPicture) {
-          const pipWindow = await localVideoRef.current.requestPictureInPicture();
-          setPipVideo(pipWindow);
+          await localVideoRef.current.requestPictureInPicture();
           setIsPiPEnabled(true);
         }
       }
@@ -603,32 +599,26 @@ const VideoCall = () => {
     }
   };
 
-  const setSpeaker = (userId) => {
-    setSpeakerUserId(userId);
-    if (layout !== 'speaker') {
-      setLayout('speaker');
-    }
-  };
 
-  const handleCopyUrl = async () => {
+  const handleCopyUrl = useCallback(async () => {
     const success = await copyRoomUrl();
     if (success) {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
-  };
+  }, []);
 
-  const handleFocusParticipant = (participantId, participantName) => {
+  const handleFocusParticipant = useCallback((participantId) => {
     setSpeakerUserId(participantId);
     if (layout !== 'speaker') {
       setLayout('speaker');
     }
     setShowParticipantsList(false);
-  };
+  }, [layout]);
 
-  const toggleParticipantsList = () => {
+  const toggleParticipantsList = useCallback(() => {
     setShowParticipantsList(!showParticipantsList);
-  };
+  }, [showParticipantsList]);
 
   const cleanupConnections = () => {
     peersRef.current.forEach(peer => {
@@ -641,7 +631,7 @@ const VideoCall = () => {
     }
   };
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = useCallback(() => {
     // Limpar conexões
     cleanupConnections();
     
@@ -652,7 +642,7 @@ const VideoCall = () => {
     
     // Redirecionar para nova sala
     window.location.href = window.location.origin;
-  };
+  }, [socket]);
 
   if (!isConnected) {
     return (
@@ -859,39 +849,47 @@ const VideoCall = () => {
         )}
 
         {/* Layout Selector */}
-        <LayoutSelector
-          currentLayout={layout}
-          onLayoutChange={handleLayoutChange}
-          isOpen={showLayoutSelector}
-          onClose={() => setShowLayoutSelector(false)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full"></div></div>}>
+          <LayoutSelector
+            currentLayout={layout}
+            onLayoutChange={handleLayoutChange}
+            isOpen={showLayoutSelector}
+            onClose={() => setShowLayoutSelector(false)}
+          />
+        </Suspense>
 
         {/* Chat */}
-        <Chat
-          isOpen={isChatOpen && layout !== 'theater'}
-          onClose={() => setIsChatOpen(false)}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          userName={userName}
-          participantCount={1 + peers.size}
-        />
+        <Suspense fallback={<div className="fixed bottom-4 right-4 bg-gray-800 p-4 rounded-lg"><div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full"></div></div>}>
+          <Chat
+            isOpen={isChatOpen && layout !== 'theater'}
+            onClose={() => setIsChatOpen(false)}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            userName={userName}
+            participantCount={1 + peers.size}
+          />
+        </Suspense>
 
         {/* Participants List */}
-        <ParticipantsList
-          localUser={{ name: userName, id: userId }}
-          peers={peers}
-          isOpen={showParticipantsList}
-          onClose={() => setShowParticipantsList(false)}
-          onFocusParticipant={handleFocusParticipant}
-        />
+        <Suspense fallback={<div className="fixed top-20 right-4 bg-gray-800 p-4 rounded-lg"><div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full"></div></div>}>
+          <ParticipantsList
+            localUser={{ name: userName, id: userId }}
+            peers={peers}
+            isOpen={showParticipantsList}
+            onClose={() => setShowParticipantsList(false)}
+            onFocusParticipant={handleFocusParticipant}
+          />
+        </Suspense>
 
         {/* Maximized Video Modal */}
         {maximizedVideo && (
-          <MaximizedVideoModal 
-            maximizedVideo={maximizedVideo}
-            localVideoRef={localVideoRef}
-            onClose={() => setMaximizedVideo(null)}
-          />
+          <Suspense fallback={<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"><div className="animate-spin w-12 h-12 border-4 border-white border-t-transparent rounded-full"></div></div>}>
+            <MaximizedVideoModal 
+              maximizedVideo={maximizedVideo}
+              localVideoRef={localVideoRef}
+              onClose={() => setMaximizedVideo(null)}
+            />
+          </Suspense>
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { memo } from 'react';
 import VideoTile from './VideoTile';
 
-const VideoGrid = ({ localVideoRef, peers, isVideoEnabled, isScreenSharing, userName, onMaximizeVideo }) => {
+const VideoGrid = memo(({ localVideoRef, peers, isVideoEnabled, isScreenSharing, userName, onMaximizeVideo }) => {
   const totalParticipants = 1 + peers.size;
 
   const getGridLayout = () => {
@@ -73,7 +73,8 @@ const VideoGrid = ({ localVideoRef, peers, isVideoEnabled, isScreenSharing, user
       </div>
     </div>
   );
-};
+});
 
+VideoGrid.displayName = 'VideoGrid';
 
 export default VideoGrid;
