@@ -119,6 +119,18 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('chat-message', (message, roomId) => {
+    console.log(`Mensagem de chat de ${message.userName} na sala ${roomId}:`, message.message);
+    
+    // Verificar se o usuário está na sala
+    if (socket.roomId === roomId) {
+      // Repassar mensagem para todos os outros usuários na sala
+      socket.to(roomId).emit('chat-message', message);
+    } else {
+      console.log(`Usuário ${socket.userId} tentou enviar mensagem para sala ${roomId} mas está na sala ${socket.roomId}`);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Usuário desconectado:', socket.id);
     

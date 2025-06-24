@@ -13,6 +13,7 @@ import ControlPanel from './ControlPanel';
 import VideoGrid from './VideoGrid';
 import NameModal from './NameModal';
 import MaximizedVideoModal from './MaximizedVideoModal';
+import Chat from './Chat';
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
@@ -30,6 +31,9 @@ const VideoCall = () => {
   const [maximizedVideo, setMaximizedVideo] = useState(null);
   const [showAudioWarning, setShowAudioWarning] = useState(false);
   const [screenShareAudioInfo, setScreenShareAudioInfo] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
@@ -171,6 +175,16 @@ const VideoCall = () => {
         peer.disconnect();
         peersRef.current.delete(disconnectedUserId);
         setPeers(new Map(peersRef.current));
+      }
+    });
+
+    socket.on('chat-message', (message) => {
+      // Não adicionar próprias mensagens (já adicionadas localmente)
+      if (message.userId !== currentUserId) {
+        setMessages(prev => [...prev, message]);
+        
+        // Aumentar contador de mensagens não lidas se chat estiver fechado
+        setUnreadMessages(prev => isChatOpen ? prev : prev + 1);
       }
     });
   };
@@ -415,6 +429,29 @@ const VideoCall = () => {
     }
   };
 
+  const handleSendMessage = (messageText) => {
+    const message = {
+      id: Date.now(),
+      message: messageText,
+      userName: userName,
+      userId: userId,
+      timestamp: Date.now()
+    };
+    
+    // Adicionar mensagem localmente
+    setMessages(prev => [...prev, message]);
+    
+    // Enviar via socket
+    socket.emit('chat-message', message, roomId);
+  };
+
+  const toggleChat = () => {
+    setIsChatOpen(!isChatOpen);
+    if (!isChatOpen) {
+      setUnreadMessages(0);
+    }
+  };
+
   const handleCopyUrl = async () => {
     const success = await copyRoomUrl();
     if (success) {
@@ -533,6 +570,9 @@ const VideoCall = () => {
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
           onToggleScreenShare={toggleScreenShare}
+          onToggleChat={toggleChat}
+          isChatOpen={isChatOpen}
+          unreadMessages={unreadMessages}
           onLeaveRoom={handleLeaveRoom}
         />
 
@@ -607,6 +647,16 @@ const VideoCall = () => {
             </div>
           </div>
         )}
+
+        {/* Chat */}
+        <Chat
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          userName={userName}
+          participantCount={1 + peers.size}
+        />
 
         {/* Maximized Video Modal */}
         {maximizedVideo && (
