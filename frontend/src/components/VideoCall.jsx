@@ -450,12 +450,16 @@ const VideoCall = () => {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       await audioContext.resume();
       
-      // Tentar reproduzir todos os vídeos remotos
-      const videos = document.querySelectorAll('video:not([muted])');
+      // Tentar reproduzir todos os vídeos remotos (exceto o local que é muted)
+      const videos = document.querySelectorAll('video');
       const promises = Array.from(videos).map(video => {
-        return video.play().catch(() => {
-          // Ignorar erros - alguns vídeos podem não ter stream ainda
-        });
+        // Só tentar reproduzir vídeos que não são o local (que deve permanecer muted)
+        if (video !== localVideoRef.current) {
+          return video.play().catch(() => {
+            // Ignorar erros - alguns vídeos podem não ter stream ainda
+          });
+        }
+        return Promise.resolve();
       });
       
       await Promise.allSettled(promises);
