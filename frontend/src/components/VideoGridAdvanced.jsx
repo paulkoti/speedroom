@@ -14,6 +14,95 @@ const VideoGridAdvanced = ({
   onLayoutChange
 }) => {
   const totalParticipants = 1 + peers.size;
+  const speakerVideoRef = useRef();
+  const sidebarVideoRef = useRef();
+  const theaterVideoRef = useRef();
+
+  // Sync video stream when layout changes or when localVideoRef stream updates
+  useEffect(() => {
+    const syncVideoStream = () => {
+      if (!localVideoRef.current || !localVideoRef.current.srcObject) return;
+      
+      const stream = localVideoRef.current.srcObject;
+      
+      // Sync based on current layout
+      if (layout === 'speaker' && speakerVideoRef.current) {
+        speakerVideoRef.current.srcObject = stream;
+        console.log('Synced stream to speaker video');
+      } else if (layout === 'sidebar' && sidebarVideoRef.current) {
+        sidebarVideoRef.current.srcObject = stream;
+        console.log('Synced stream to sidebar video');
+      } else if (layout === 'theater' && theaterVideoRef.current) {
+        theaterVideoRef.current.srcObject = stream;
+        console.log('Synced stream to theater video');
+      }
+    };
+
+    // Sync immediately
+    syncVideoStream();
+    
+    // Also sync after delays to ensure DOM is ready
+    const timer1 = setTimeout(syncVideoStream, 100);
+    const timer2 = setTimeout(syncVideoStream, 500);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [layout, localVideoRef.current?.srcObject]);
+
+  // Monitor for stream changes on localVideoRef
+  useEffect(() => {
+    if (!localVideoRef.current) return;
+
+    const handleStreamChange = () => {
+      const stream = localVideoRef.current?.srcObject;
+      if (stream) {
+        console.log('Local video stream changed, re-syncing to layout:', layout);
+        
+        // Apply stream to current layout
+        if (layout === 'speaker' && speakerVideoRef.current) {
+          speakerVideoRef.current.srcObject = stream;
+        } else if (layout === 'sidebar' && sidebarVideoRef.current) {
+          sidebarVideoRef.current.srcObject = stream;
+        } else if (layout === 'theater' && theaterVideoRef.current) {
+          theaterVideoRef.current.srcObject = stream;
+        }
+      }
+    };
+
+    const videoElement = localVideoRef.current;
+    
+    // Listen for loadedmetadata event which fires when stream is assigned
+    videoElement.addEventListener('loadedmetadata', handleStreamChange);
+    
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', handleStreamChange);
+    };
+  }, [layout]);
+
+  // Force sync when video refs are available and layout changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!localVideoRef.current?.srcObject) return;
+      
+      const stream = localVideoRef.current.srcObject;
+      console.log('Force syncing stream for layout:', layout, 'Stream:', stream);
+      
+      if (layout === 'speaker' && speakerVideoRef.current && !speakerVideoRef.current.srcObject) {
+        speakerVideoRef.current.srcObject = stream;
+        console.log('Force synced to speaker video');
+      } else if (layout === 'sidebar' && sidebarVideoRef.current && !sidebarVideoRef.current.srcObject) {
+        sidebarVideoRef.current.srcObject = stream;
+        console.log('Force synced to sidebar video');
+      } else if (layout === 'theater' && theaterVideoRef.current && !theaterVideoRef.current.srcObject) {
+        theaterVideoRef.current.srcObject = stream;
+        console.log('Force synced to theater video');
+      }
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, [layout, speakerVideoRef.current, sidebarVideoRef.current, theaterVideoRef.current]);
 
   // Grid Layout (original)
   const getGridLayout = () => {
@@ -47,15 +136,16 @@ const VideoGridAdvanced = ({
                 className="relative group cursor-pointer h-full"
                 onClick={() => onMaximizeVideo({
                   type: 'local',
-                  videoRef: localVideoRef,
+                  videoRef: speakerVideoRef,
                   userName: userName || 'Você'
                 })}
               >
                 <video
-                  ref={localVideoRef}
+                  ref={speakerVideoRef}
                   autoPlay
                   muted
                   playsInline
+                  onLoadedMetadata={() => console.log('Speaker video loaded metadata')}
                   className={`w-full h-full bg-gray-800 rounded-xl ${isScreenSharing ? 'object-contain' : 'object-cover'} shadow-xl`}
                 />
                 <div className="absolute top-4 left-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
@@ -143,14 +233,15 @@ const VideoGridAdvanced = ({
       <div className="flex-1 grid gap-2 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 p-4">
         <div className="relative group cursor-pointer" onClick={() => onMaximizeVideo({
           type: 'local',
-          videoRef: localVideoRef,
+          videoRef: sidebarVideoRef,
           userName: userName || 'Você'
         })}>
           <video
-            ref={localVideoRef}
+            ref={sidebarVideoRef}
             autoPlay
             muted
             playsInline
+            onLoadedMetadata={() => console.log('Sidebar video loaded metadata')}
             className={`w-full h-64 bg-gray-800 rounded-xl ${isScreenSharing ? 'object-contain' : 'object-cover'} shadow-lg transition-all duration-300 group-hover:shadow-xl`}
           />
           <div className="absolute top-3 left-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
@@ -199,10 +290,11 @@ const VideoGridAdvanced = ({
     <div className="fixed inset-0 bg-black z-40 flex items-center justify-center">
       <div className="relative w-full h-full flex items-center justify-center">
         <video
-          ref={localVideoRef}
+          ref={theaterVideoRef}
           autoPlay
           muted
           playsInline
+          onLoadedMetadata={() => console.log('Theater video loaded metadata')}
           className={`max-w-full max-h-full ${isScreenSharing ? 'object-contain' : 'object-cover'}`}
         />
         
