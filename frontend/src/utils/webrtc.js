@@ -163,8 +163,16 @@ export class WebRTCConnection {
   async startScreenShare() {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true
+        video: {
+          cursor: "always",
+          displaySurface: "monitor"
+        },
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          sampleRate: 44100,
+          channelCount: 2
+        }
       });
 
       // Armazenar referência da stream original se ainda não temos
@@ -175,6 +183,21 @@ export class WebRTCConnection {
       // Substituir tracks de vídeo
       const videoTrack = screenStream.getVideoTracks()[0];
       await this.replaceVideoTrack(videoTrack);
+
+      // Substituir áudio se disponível
+      const audioTrack = screenStream.getAudioTracks()[0];
+      if (audioTrack) {
+        const audioSender = this.peerConnection.getSenders().find(s => 
+          s.track && s.track.kind === 'audio'
+        );
+        
+        if (audioSender) {
+          await audioSender.replaceTrack(audioTrack);
+          console.log('Áudio da tela substituído:', audioTrack.label);
+        }
+      } else {
+        console.log('Nenhum áudio de sistema capturado - usuário pode não ter permitido');
+      }
 
       // Atualizar stream local
       this.localStream = screenStream;
@@ -196,7 +219,21 @@ export class WebRTCConnection {
       if (this.originalStream) {
         // Restaurar stream original
         const videoTrack = this.originalStream.getVideoTracks()[0];
+        const audioTrack = this.originalStream.getAudioTracks()[0];
+        
         await this.replaceVideoTrack(videoTrack);
+
+        // Restaurar áudio do microfone também
+        if (audioTrack) {
+          const audioSender = this.peerConnection.getSenders().find(s => 
+            s.track && s.track.kind === 'audio'
+          );
+          
+          if (audioSender) {
+            await audioSender.replaceTrack(audioTrack);
+            console.log('Áudio do microfone restaurado');
+          }
+        }
 
         // Restaurar vídeo local
         if (this.localVideoRef.current) {

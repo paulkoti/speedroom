@@ -29,6 +29,7 @@ const VideoCall = () => {
   const [useFakeVideo, setUseFakeVideo] = useState(false);
   const [maximizedVideo, setMaximizedVideo] = useState(null);
   const [showAudioWarning, setShowAudioWarning] = useState(false);
+  const [screenShareAudioInfo, setScreenShareAudioInfo] = useState(null);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
@@ -279,8 +280,15 @@ const VideoCall = () => {
       // Iniciar compartilhamento de tela
       try {
         const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
+          video: {
+            cursor: "always",
+            displaySurface: "monitor"
+          },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            sampleRate: 44100
+          }
         });
         
         // Armazenar stream original antes de substituir
@@ -295,20 +303,55 @@ const VideoCall = () => {
         
         // Substituir tracks em todas as conexões peer
         const videoTrack = screenStream.getVideoTracks()[0];
+        const audioTrack = screenStream.getAudioTracks()[0]; // Áudio da tela (se disponível)
+        
         for (const [, peer] of peersRef.current) {
           // Armazenar stream original no peer
           if (!peer.originalStream && originalStream) {
             peer.originalStream = originalStream;
           }
           
-          const sender = peer.peerConnection.getSenders().find(s => 
+          // Substituir track de vídeo
+          const videoSender = peer.peerConnection.getSenders().find(s => 
             s.track && s.track.kind === 'video'
           );
           
-          if (sender) {
-            await sender.replaceTrack(videoTrack);
+          if (videoSender && videoTrack) {
+            await videoSender.replaceTrack(videoTrack);
+          }
+          
+          // Se há áudio da tela, substituir também o track de áudio
+          if (audioTrack) {
+            const audioSender = peer.peerConnection.getSenders().find(s => 
+              s.track && s.track.kind === 'audio'
+            );
+            
+            if (audioSender) {
+              await audioSender.replaceTrack(audioTrack);
+            }
           }
         }
+        
+        // Log para debug e mostrar info para usuário
+        const hasScreenAudio = screenStream.getAudioTracks().length > 0;
+        console.log('Screen sharing iniciado:', {
+          hasVideo: screenStream.getVideoTracks().length > 0,
+          hasAudio: hasScreenAudio,
+          audioTrack: audioTrack ? audioTrack.label : 'Não disponível'
+        });
+        
+        // Mostrar informação sobre áudio para o usuário
+        setScreenShareAudioInfo({
+          hasAudio: hasScreenAudio,
+          message: hasScreenAudio ? 
+            'Compartilhamento com áudio ativado!' : 
+            'Apenas vídeo compartilhado. Para incluir áudio, marque "Compartilhar áudio da aba" na próxima vez.'
+        });
+        
+        // Auto-hide após 4 segundos
+        setTimeout(() => {
+          setScreenShareAudioInfo(null);
+        }, 4000);
         
         // Listener para quando o usuário para de compartilhar via browser
         videoTrack.onended = async () => {
@@ -321,12 +364,22 @@ const VideoCall = () => {
           if (newStream) {
             for (const [, peer] of peersRef.current) {
               const newVideoTrack = newStream.getVideoTracks()[0];
-              const sender = peer.peerConnection.getSenders().find(s => 
+              const newAudioTrack = newStream.getAudioTracks()[0];
+              
+              // Restaurar vídeo
+              const videoSender = peer.peerConnection.getSenders().find(s => 
                 s.track && s.track.kind === 'video'
               );
+              if (videoSender && newVideoTrack) {
+                await videoSender.replaceTrack(newVideoTrack);
+              }
               
-              if (sender && newVideoTrack) {
-                await sender.replaceTrack(newVideoTrack);
+              // Restaurar áudio do microfone
+              const audioSender = peer.peerConnection.getSenders().find(s => 
+                s.track && s.track.kind === 'audio'
+              );
+              if (audioSender && newAudioTrack) {
+                await audioSender.replaceTrack(newAudioTrack);
               }
             }
           }
@@ -488,6 +541,39 @@ const VideoCall = () => {
           isOpen={showNameModal}
           onEnter={handleEnterRoom}
         />
+
+        {/* Screen Share Audio Info */}
+        {screenShareAudioInfo && (
+          <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-40 px-6 py-4 rounded-xl shadow-2xl max-w-md mx-4 ${
+            screenShareAudioInfo.hasAudio 
+              ? 'bg-gradient-to-r from-green-600 to-emerald-600 border border-green-500/30' 
+              : 'bg-gradient-to-r from-yellow-600 to-orange-600 border border-yellow-500/30'
+          } text-white`}>
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                {screenShareAudioInfo.hasAudio ? (
+                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.791L6.914 15H4a1 1 0 01-1-1V8a1 1 0 011-1h2.914l1.469-1.209A1 1 0 019.383 3.076zM14.657 2.929a1 1 0 010 1.414L13.414 5.586a1 1 0 01-1.414-1.414L13.243 2.93a1 1 0 011.414 0zM16.243 4.515a1 1 0 010 1.414L14.828 7.343a1 1 0 01-1.414-1.414l1.415-1.414a1 1 0 011.414 0z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.791L6.914 15H4a1 1 0 01-1-1V8a1 1 0 011-1h2.914l1.469-1.209A1 1 0 019.383 3.076zM14.657 2.929a1 1 0 010 1.414L13.414 5.586a1 1 0 01-1.414-1.414L13.243 2.93a1 1 0 011.414 0zM11.414 9l1.414-1.414a1 1 0 011.414 1.414L13 10.414l1.414 1.414a1 1 0 01-1.414 1.414L11.414 11.8a1 1 0 010-1.414z" clipRule="evenodd" />
+                )}
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  {screenShareAudioInfo.message}
+                </p>
+              </div>
+              <button
+                onClick={() => setScreenShareAudioInfo(null)}
+                className="text-white/70 hover:text-white p-1 transition-colors duration-200"
+                title="Fechar"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Audio Warning for Chrome */}
         {showAudioWarning && (
