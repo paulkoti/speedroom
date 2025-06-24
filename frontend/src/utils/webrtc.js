@@ -143,6 +143,81 @@ export class WebRTCConnection {
     return false;
   }
 
+  async startScreenShare() {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+
+      // Armazenar referência da stream original
+      this.originalStream = this.localStream;
+      
+      // Substituir tracks de vídeo
+      const videoTrack = screenStream.getVideoTracks()[0];
+      const sender = this.peerConnection.getSenders().find(s => 
+        s.track && s.track.kind === 'video'
+      );
+
+      if (sender) {
+        await sender.replaceTrack(videoTrack);
+      }
+
+      // Atualizar stream local
+      this.localStream = screenStream;
+      
+      // Atualizar vídeo local
+      if (this.localVideoRef.current) {
+        this.localVideoRef.current.srcObject = screenStream;
+      }
+
+      // Listener para quando o usuário para de compartilhar
+      videoTrack.onended = () => {
+        this.stopScreenShare();
+      };
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao iniciar compartilhamento de tela:', error);
+      return false;
+    }
+  }
+
+  async stopScreenShare() {
+    try {
+      if (this.originalStream) {
+        // Restaurar stream original
+        const videoTrack = this.originalStream.getVideoTracks()[0];
+        const sender = this.peerConnection.getSenders().find(s => 
+          s.track && s.track.kind === 'video'
+        );
+
+        if (sender && videoTrack) {
+          await sender.replaceTrack(videoTrack);
+        }
+
+        // Restaurar vídeo local
+        if (this.localVideoRef.current) {
+          this.localVideoRef.current.srcObject = this.originalStream;
+        }
+
+        // Parar stream de compartilhamento
+        if (this.localStream && this.localStream !== this.originalStream) {
+          this.localStream.getTracks().forEach(track => track.stop());
+        }
+
+        this.localStream = this.originalStream;
+        this.originalStream = null;
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Erro ao parar compartilhamento de tela:', error);
+      return false;
+    }
+  }
+
   disconnect() {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());

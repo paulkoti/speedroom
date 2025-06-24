@@ -1,8 +1,10 @@
 const ControlPanel = ({ 
   isAudioEnabled, 
-  isVideoEnabled, 
+  isVideoEnabled,
+  isScreenSharing,
   onToggleAudio, 
   onToggleVideo,
+  onToggleScreenShare,
   onLeaveRoom 
 }) => {
   return (
@@ -44,6 +46,28 @@ const ControlPanel = ({
           ) : (
             <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A2 2 0 0018 13V7a1 1 0 00-1.447-.894l-2 1A1 1 0 0014 8v4.586l-3-3V6a2 2 0 00-2-2H5.414l-1.707-1.707zM4 6.414L2.586 5A2 2 0 002 6v6a2 2 0 002 2h6a2 2 0 002-2v-.586L10.586 10H4V6.414z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
+
+        <button
+          onClick={onToggleScreenShare}
+          className={`p-3 md:p-4 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+            isScreenSharing 
+              ? 'bg-green-600/90 hover:bg-green-500/90 text-white shadow-lg shadow-green-500/25' 
+              : 'bg-gray-700/80 hover:bg-gray-600/80 text-white shadow-lg'
+          }`}
+          title={isScreenSharing ? 'Parar compartilhamento' : 'Compartilhar tela'}
+        >
+          {isScreenSharing ? (
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 4v4h10V8H5zm3-2a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              <path d="M2 18a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 4v4h10V8H5z" clipRule="evenodd" />
+              <path d="M2 18a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1z" />
             </svg>
           )}
         </button>

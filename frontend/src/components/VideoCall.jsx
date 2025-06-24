@@ -22,6 +22,7 @@ const VideoCall = () => {
   const [peers, setPeers] = useState(new Map());
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [useFakeVideo, setUseFakeVideo] = useState(false);
@@ -222,6 +223,66 @@ const VideoCall = () => {
     }
   };
 
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      // Parar compartilhamento de tela
+      let success = false;
+      for (const [, peer] of peersRef.current) {
+        const result = await peer.stopScreenShare();
+        if (result) success = true;
+      }
+      
+      if (success || peersRef.current.size === 0) {
+        // Se não há peers, ainda precisamos parar localmente
+        if (localStream && localStream.getTracks().some(track => track.kind === 'video' && track.label.includes('screen'))) {
+          localStream.getTracks().forEach(track => {
+            if (track.kind === 'video') track.stop();
+          });
+          await initializeMedia();
+        }
+        setIsScreenSharing(false);
+      }
+    } else {
+      // Iniciar compartilhamento de tela
+      let success = false;
+      for (const [, peer] of peersRef.current) {
+        const result = await peer.startScreenShare();
+        if (result) success = true;
+      }
+      
+      if (success || peersRef.current.size === 0) {
+        // Se não há peers, ainda vamos tentar compartilhar localmente
+        if (peersRef.current.size === 0) {
+          try {
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({
+              video: true,
+              audio: true
+            });
+            
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = screenStream;
+            }
+            setLocalStream(screenStream);
+            localStreamRef.current = screenStream;
+            
+            screenStream.getVideoTracks()[0].onended = () => {
+              setIsScreenSharing(false);
+              initializeMedia();
+            };
+            
+            success = true;
+          } catch (error) {
+            console.error('Erro ao compartilhar tela:', error);
+          }
+        }
+        
+        if (success) {
+          setIsScreenSharing(true);
+        }
+      }
+    }
+  };
+
   const handleCopyUrl = async () => {
     const success = await copyRoomUrl();
     if (success) {
@@ -334,8 +395,10 @@ const VideoCall = () => {
         <ControlPanel
           isAudioEnabled={isAudioEnabled}
           isVideoEnabled={isVideoEnabled}
+          isScreenSharing={isScreenSharing}
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
+          onToggleScreenShare={toggleScreenShare}
           onLeaveRoom={handleLeaveRoom}
         />
 
