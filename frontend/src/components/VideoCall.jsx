@@ -11,11 +11,14 @@ import {
 } from '../utils/roomUtils';
 import ControlPanel from './ControlPanel';
 import VideoGrid from './VideoGrid';
+import NameModal from './NameModal';
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
   const [roomId, setRoomId] = useState('');
   const [userId, setUserId] = useState('');
+  const [userName, setUserName] = useState('');
+  const [showNameModal, setShowNameModal] = useState(true);
   const [peers, setPeers] = useState(new Map());
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
@@ -27,9 +30,10 @@ const VideoCall = () => {
   const localStreamRef = useRef(null);
   const peersRef = useRef(new Map());
 
-  useEffect(() => {
-    if (!isConnected || !socket) return;
-
+  const handleEnterRoom = async (name) => {
+    setUserName(name);
+    setShowNameModal(false);
+    
     const currentUserId = generateUserId();
     setUserId(currentUserId);
 
@@ -40,16 +44,19 @@ const VideoCall = () => {
     }
     setRoomId(currentRoomId);
 
-    setupSocketListeners(currentUserId);
+    setupSocketListeners(currentUserId, name);
     
-    initializeMedia().then(() => {
-      socket.emit('join-room', currentRoomId, currentUserId);
-    });
+    await initializeMedia();
+    socket.emit('join-room', currentRoomId, currentUserId, name);
+  };
+
+  useEffect(() => {
+    if (!isConnected || !socket || showNameModal) return;
 
     return () => {
       cleanupConnections();
     };
-  }, [isConnected, socket]);
+  }, [isConnected, socket, showNameModal]);
 
   const initializeMedia = async () => {
     try {
@@ -88,9 +95,9 @@ const VideoCall = () => {
     }
   };
 
-  const setupSocketListeners = (currentUserId) => {
-    socket.on('user-connected', async (remoteUserId) => {
-      console.log(`[${currentUserId}] Usuário conectado: ${remoteUserId}`);
+  const setupSocketListeners = (currentUserId, currentUserName) => {
+    socket.on('user-connected', async (remoteUserId, remoteUserName) => {
+      console.log(`[${currentUserId}] Usuário conectado: ${remoteUserId} (${remoteUserName})`);
       
       // Verificar se já não temos uma conexão com este usuário
       if (!peersRef.current.has(remoteUserId)) {
@@ -100,7 +107,7 @@ const VideoCall = () => {
         const shouldInitiate = currentUserId > remoteUserId;
         console.log(`[${currentUserId}] Deve iniciar conexão com ${remoteUserId}:`, shouldInitiate);
         
-        await createPeerConnection(remoteUserId, shouldInitiate);
+        await createPeerConnection(remoteUserId, shouldInitiate, remoteUserName);
       } else {
         console.log(`[${currentUserId}] Conexão já existe para: ${remoteUserId}`);
       }
@@ -114,7 +121,7 @@ const VideoCall = () => {
           await peer.handleOffer(offer);
         } else {
           console.log(`Peer não encontrado para ${fromUserId}, criando...`);
-          await createPeerConnection(fromUserId, false);
+          await createPeerConnection(fromUserId, false, 'Usuário');
           const newPeer = peersRef.current.get(fromUserId);
           if (newPeer) {
             await newPeer.handleOffer(offer);
@@ -154,7 +161,7 @@ const VideoCall = () => {
     });
   };
 
-  const createPeerConnection = async (remoteUserId, shouldCreateOffer) => {
+  const createPeerConnection = async (remoteUserId, shouldCreateOffer, remoteUserName = 'Usuário') => {
     console.log(`[${userId}] Criando peer connection para ${remoteUserId}, oferecendo: ${shouldCreateOffer}`);
     
     const remoteVideoRef = { current: null };
@@ -183,6 +190,7 @@ const VideoCall = () => {
 
     // Salvar referência do peer corretamente
     peer.videoRef = remoteVideoRef;
+    peer.userName = remoteUserName;
     peersRef.current.set(remoteUserId, peer);
     setPeers(new Map(peersRef.current));
     
@@ -318,6 +326,7 @@ const VideoCall = () => {
             localVideoRef={localVideoRef}
             peers={peers}
             isVideoEnabled={isVideoEnabled}
+            userName={userName}
           />
         </main>
 
@@ -328,6 +337,12 @@ const VideoCall = () => {
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
           onLeaveRoom={handleLeaveRoom}
+        />
+
+        {/* Name Modal */}
+        <NameModal 
+          isOpen={showNameModal}
+          onEnter={handleEnterRoom}
         />
       </div>
     </div>

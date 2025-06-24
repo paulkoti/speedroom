@@ -75,7 +75,7 @@ const VideoTile = ({ peerId, peer, videoHeight }) => {
       <div className="absolute top-3 left-3 bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-full text-xs md:text-sm font-medium shadow-lg">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          {peerId.slice(-6)}
+          {peer?.userName || peerId.slice(-6)}
         </div>
       </div>
       {!streamAssigned && (

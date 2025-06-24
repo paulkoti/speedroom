@@ -24,11 +24,12 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('Usuário conectado:', socket.id);
 
-  socket.on('join-room', (roomId, userId) => {
-    console.log(`Usuário ${userId} entrando na sala ${roomId}`);
+  socket.on('join-room', (roomId, userId, userName) => {
+    console.log(`Usuário ${userId} (${userName}) entrando na sala ${roomId}`);
     
     socket.join(roomId);
     socket.userId = userId;
+    socket.userName = userName || 'Usuário';
     socket.roomId = roomId;
 
     if (!rooms.has(roomId)) {
@@ -42,13 +43,18 @@ io.on('connection', (socket) => {
     console.log(`Usuários na sala ${roomId}:`, roomUsers);
 
     // Notificar todos os usuários existentes sobre o novo usuário
-    socket.to(roomId).emit('user-connected', userId);
+    socket.to(roomId).emit('user-connected', userId, userName);
     
     // Para o novo usuário, enviar eventos individuais para cada usuário existente
     existingUsers.forEach(existingUserId => {
       if (existingUserId !== userId) {
-        console.log(`Notificando ${userId} sobre usuário existente ${existingUserId}`);
-        socket.emit('user-connected', existingUserId);
+        // Encontrar o nome do usuário existente
+        const existingSocket = Array.from(io.sockets.sockets.values())
+          .find(s => s.userId === existingUserId && s.roomId === roomId);
+        const existingUserName = existingSocket?.userName || 'Usuário';
+        
+        console.log(`Notificando ${userId} sobre usuário existente ${existingUserId} (${existingUserName})`);
+        socket.emit('user-connected', existingUserId, existingUserName);
       }
     });
   });

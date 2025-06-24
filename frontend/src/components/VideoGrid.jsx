@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import VideoTile from './VideoTile';
 
-const VideoGrid = ({ localVideoRef, peers, isVideoEnabled }) => {
+const VideoGrid = ({ localVideoRef, peers, isVideoEnabled, userName }) => {
   const totalParticipants = 1 + peers.size;
 
   const getGridLayout = () => {
@@ -33,7 +33,7 @@ const VideoGrid = ({ localVideoRef, peers, isVideoEnabled }) => {
           <div className="absolute top-3 left-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-xs md:text-sm font-medium shadow-lg">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              Você
+              {userName || 'Você'}
             </div>
           </div>
           {!isVideoEnabled && (
