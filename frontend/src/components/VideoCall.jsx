@@ -16,6 +16,7 @@ import NameModal from './NameModal';
 import MaximizedVideoModal from './MaximizedVideoModal';
 import Chat from './Chat';
 import LayoutSelector from './LayoutSelector';
+import ParticipantsList from './ParticipantsList';
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
@@ -41,6 +42,7 @@ const VideoCall = () => {
   const [speakerUserId, setSpeakerUserId] = useState(null);
   const [isPiPEnabled, setIsPiPEnabled] = useState(false);
   const [pipVideo, setPipVideo] = useState(null);
+  const [showParticipantsList, setShowParticipantsList] = useState(false);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
@@ -576,6 +578,18 @@ const VideoCall = () => {
     }
   };
 
+  const handleFocusParticipant = (participantId, participantName) => {
+    setSpeakerUserId(participantId);
+    if (layout !== 'speaker') {
+      setLayout('speaker');
+    }
+    setShowParticipantsList(false);
+  };
+
+  const toggleParticipantsList = () => {
+    setShowParticipantsList(!showParticipantsList);
+  };
+
   const cleanupConnections = () => {
     peersRef.current.forEach(peer => {
       if (peer.disconnect) peer.disconnect();
@@ -657,6 +671,17 @@ const VideoCall = () => {
                   title="Alterar layout"
                 >
                   📐 Layout
+                </button>
+
+                <button
+                  onClick={toggleParticipantsList}
+                  className="px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 bg-gray-700/80 hover:bg-gray-600/80 text-gray-300 hover:text-white flex items-center gap-1"
+                  title="Ver participantes"
+                >
+                  👥 <span className="hidden sm:inline">Participantes</span>
+                  <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {1 + peers.size}
+                  </span>
                 </button>
 
                 <button
@@ -807,6 +832,15 @@ const VideoCall = () => {
           onSendMessage={handleSendMessage}
           userName={userName}
           participantCount={1 + peers.size}
+        />
+
+        {/* Participants List */}
+        <ParticipantsList
+          localUser={{ name: userName, id: userId }}
+          peers={peers}
+          isOpen={showParticipantsList}
+          onClose={() => setShowParticipantsList(false)}
+          onFocusParticipant={handleFocusParticipant}
         />
 
         {/* Maximized Video Modal */}
