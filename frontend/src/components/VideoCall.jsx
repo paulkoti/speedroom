@@ -28,6 +28,7 @@ const VideoCall = () => {
   const [localStream, setLocalStream] = useState(null);
   const [useFakeVideo, setUseFakeVideo] = useState(false);
   const [maximizedVideo, setMaximizedVideo] = useState(null);
+  const [showAudioWarning, setShowAudioWarning] = useState(false);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
@@ -50,6 +51,15 @@ const VideoCall = () => {
     setupSocketListeners(currentUserId, name);
     
     await initializeMedia();
+    
+    // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
+    setTimeout(() => {
+      const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+      if (isChrome) {
+        setShowAudioWarning(true);
+      }
+    }, 3000); // Mostrar após 3 segundos
+    
     socket.emit('join-room', currentRoomId, currentUserId, name);
   };
 
@@ -329,6 +339,29 @@ const VideoCall = () => {
     }
   };
 
+  const enableAudio = async () => {
+    try {
+      // Criar um contexto de áudio e reproduzir um som silencioso
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      await audioContext.resume();
+      
+      // Tentar reproduzir todos os vídeos remotos
+      const videos = document.querySelectorAll('video:not([muted])');
+      const promises = Array.from(videos).map(video => {
+        return video.play().catch(() => {
+          // Ignorar erros - alguns vídeos podem não ter stream ainda
+        });
+      });
+      
+      await Promise.allSettled(promises);
+      setShowAudioWarning(false);
+      
+      console.log('Áudio habilitado com sucesso');
+    } catch (error) {
+      console.error('Erro ao habilitar áudio:', error);
+    }
+  };
+
   const handleCopyUrl = async () => {
     const success = await copyRoomUrl();
     if (success) {
@@ -455,6 +488,39 @@ const VideoCall = () => {
           isOpen={showNameModal}
           onEnter={handleEnterRoom}
         />
+
+        {/* Audio Warning for Chrome */}
+        {showAudioWarning && (
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-4 rounded-xl shadow-2xl border border-orange-500/30 max-w-md mx-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">Áudio bloqueado pelo Chrome</p>
+                <p className="text-xs opacity-90">Clique para habilitar o som dos participantes</p>
+              </div>
+              <button
+                onClick={enableAudio}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.791L6.914 15H4a1 1 0 01-1-1V8a1 1 0 011-1h2.914l1.469-1.209A1 1 0 019.383 3.076zM14.657 2.929a1 1 0 010 1.414L13.414 5.586a1 1 0 01-1.414-1.414L13.243 2.93a1 1 0 011.414 0zM11.414 9l1.414-1.414a1 1 0 011.414 1.414L13 10.414l1.414 1.414a1 1 0 01-1.414 1.414L11.414 11.8a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                Ativar
+              </button>
+              <button
+                onClick={() => setShowAudioWarning(false)}
+                className="text-white/70 hover:text-white p-1 transition-colors duration-200"
+                title="Dispensar aviso"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Maximized Video Modal */}
         {maximizedVideo && (
