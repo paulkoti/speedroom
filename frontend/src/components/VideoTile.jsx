@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
   const videoRef = useRef();
   const [streamAssigned, setStreamAssigned] = useState(false);
+  const [isScreenShare, setIsScreenShare] = useState(false);
 
   // Immediate ref assignment
   useEffect(() => {
@@ -23,6 +24,14 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
       if (peer.remoteStream && videoRef.current) {
         videoRef.current.srcObject = peer.remoteStream;
         setStreamAssigned(true);
+        
+        // Detectar se é screen share baseado no label do track
+        const videoTrack = peer.remoteStream.getVideoTracks()[0];
+        if (videoTrack) {
+          const isScreen = videoTrack.label.includes('screen') || videoTrack.label.includes('Screen');
+          setIsScreenShare(isScreen);
+        }
+        
         console.log(`Stream assigned to ${peerId} from cache`);
         return;
       }
@@ -40,6 +49,11 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
           const stream = new MediaStream([videoReceiver.track]);
           videoRef.current.srcObject = stream;
           setStreamAssigned(true);
+          
+          // Detectar se é screen share baseado no label do track
+          const isScreen = videoReceiver.track.label.includes('screen') || videoReceiver.track.label.includes('Screen');
+          setIsScreenShare(isScreen);
+          
           console.log(`Stream assigned to ${peerId} from receiver`);
           return;
         }
@@ -74,7 +88,7 @@ const VideoTile = ({ peerId, peer, videoHeight, onMaximizeVideo }) => {
         ref={videoRef}
         autoPlay
         playsInline
-        className={`w-full ${videoHeight || 'h-64'} bg-gray-800 rounded-xl object-contain shadow-lg transition-all duration-300 group-hover:shadow-xl`}
+        className={`w-full ${videoHeight || 'h-64'} bg-gray-800 rounded-xl ${isScreenShare ? 'object-contain' : 'object-cover'} shadow-lg transition-all duration-300 group-hover:shadow-xl`}
       />
       <div className="absolute top-3 left-3 bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-full text-xs md:text-sm font-medium shadow-lg">
         <div className="flex items-center gap-2">
