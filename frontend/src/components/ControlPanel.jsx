@@ -2,7 +2,8 @@ const ControlPanel = ({
   isAudioEnabled, 
   isVideoEnabled, 
   onToggleAudio, 
-  onToggleVideo 
+  onToggleVideo,
+  onLeaveRoom 
 }) => {
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2">
@@ -48,7 +49,7 @@ const ControlPanel = ({
         </button>
 
         <button
-          onClick={() => window.location.reload()}
+          onClick={onLeaveRoom}
           className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
           title="Sair da chamada"
         >

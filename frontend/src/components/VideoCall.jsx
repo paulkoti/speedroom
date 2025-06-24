@@ -233,6 +233,19 @@ const VideoCall = () => {
     }
   };
 
+  const handleLeaveRoom = () => {
+    // Limpar conexões
+    cleanupConnections();
+    
+    // Desconectar do socket
+    if (socket) {
+      socket.disconnect();
+    }
+    
+    // Redirecionar para nova sala
+    window.location.href = window.location.origin;
+  };
+
   if (!isConnected) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -282,6 +295,7 @@ const VideoCall = () => {
           isVideoEnabled={isVideoEnabled}
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
+          onLeaveRoom={handleLeaveRoom}
         />
       </div>
     </div>
