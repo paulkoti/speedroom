@@ -255,41 +255,73 @@ const VideoCall = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Speed Room</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">Sala: {roomId}</span>
-            <button
-              onClick={() => setUseFakeVideo(!useFakeVideo)}
-              className={`px-3 py-1 text-sm rounded transition-colors ${
-                useFakeVideo 
-                  ? 'bg-orange-600 text-white' 
-                  : 'bg-gray-600 hover:bg-gray-700 text-white'
-              }`}
-            >
-              {useFakeVideo ? 'Vídeo Fake' : 'Câmera Real'}
-            </button>
-            <button
-              onClick={handleCopyUrl}
-              className={`px-4 py-2 rounded transition-colors ${
-                isCopied 
-                  ? 'bg-green-600 text-white' 
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {isCopied ? 'Copiado!' : 'Copiar Link'}
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl"></div>
+      </div>
+      
+      <div className="relative z-10 min-h-screen">
+        {/* Header */}
+        <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16 md:h-20">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                  </svg>
+                </div>
+                <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                  Speed Room
+                </h1>
+              </div>
+              
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="hidden sm:flex items-center gap-2 bg-gray-800/50 rounded-lg px-3 py-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs md:text-sm text-gray-300">
+                    Sala: <span className="text-white font-mono">{roomId.slice(-8)}</span>
+                  </span>
+                </div>
+                
+                <button
+                  onClick={() => setUseFakeVideo(!useFakeVideo)}
+                  className={`px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 ${
+                    useFakeVideo 
+                      ? 'bg-orange-600/90 hover:bg-orange-500/90 text-white shadow-lg shadow-orange-500/25' 
+                      : 'bg-gray-700/80 hover:bg-gray-600/80 text-gray-300 hover:text-white'
+                  }`}
+                >
+                  {useFakeVideo ? '🎭 Fake' : '📹 Real'}
+                </button>
+                
+                <button
+                  onClick={handleCopyUrl}
+                  className={`px-3 md:px-4 py-2 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+                    isCopied 
+                      ? 'bg-green-600/90 text-white shadow-lg shadow-green-500/25' 
+                      : 'bg-blue-600/90 hover:bg-blue-500/90 text-white shadow-lg shadow-blue-500/25'
+                  }`}
+                >
+                  {isCopied ? '✅ Copiado!' : '🔗 Compartilhar'}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </header>
 
-        <VideoGrid 
-          localVideoRef={localVideoRef}
-          peers={peers}
-          isVideoEnabled={isVideoEnabled}
-        />
+        {/* Main content */}
+        <main className="flex-1">
+          <VideoGrid 
+            localVideoRef={localVideoRef}
+            peers={peers}
+            isVideoEnabled={isVideoEnabled}
+          />
+        </main>
 
+        {/* Controls */}
         <ControlPanel
           isAudioEnabled={isAudioEnabled}
           isVideoEnabled={isVideoEnabled}

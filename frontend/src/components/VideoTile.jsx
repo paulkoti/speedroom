@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const VideoTile = ({ peerId, peer }) => {
+const VideoTile = ({ peerId, peer, videoHeight }) => {
   const videoRef = useRef();
   const [streamAssigned, setStreamAssigned] = useState(false);
 
@@ -65,16 +65,27 @@ const VideoTile = ({ peerId, peer }) => {
   }, [peer, peerId, streamAssigned]);
 
   return (
-    <div className="relative">
+    <div className="relative group">
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        className="w-full h-64 bg-gray-800 rounded-lg object-cover"
+        className={`w-full ${videoHeight || 'h-64'} bg-gray-800 rounded-xl object-cover shadow-lg transition-all duration-300 group-hover:shadow-xl`}
       />
-      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-        {peerId.slice(-6)}
+      <div className="absolute top-3 left-3 bg-gradient-to-r from-green-600 to-blue-600 text-white px-3 py-1 rounded-full text-xs md:text-sm font-medium shadow-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          {peerId.slice(-6)}
+        </div>
       </div>
+      {!streamAssigned && (
+        <div className="absolute inset-0 bg-gray-900 bg-opacity-75 rounded-xl flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-blue-500 mx-auto mb-2"></div>
+            <p className="text-xs md:text-sm opacity-75">Conectando...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
