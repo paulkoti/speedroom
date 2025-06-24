@@ -43,38 +43,48 @@ const VideoCall = () => {
   const [isPiPEnabled, setIsPiPEnabled] = useState(false);
   const [pipVideo, setPipVideo] = useState(null);
   const [showParticipantsList, setShowParticipantsList] = useState(false);
+  const [roomError, setRoomError] = useState('');
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
   const peersRef = useRef(new Map());
 
-  const handleEnterRoom = async (name) => {
+  const handleEnterRoom = async (name, password = '') => {
+    setRoomError('');
     setUserName(name);
-    setShowNameModal(false);
     
     const currentUserId = generateUserId();
     setUserId(currentUserId);
 
     let currentRoomId = getRoomIdFromUrl();
     if (!currentRoomId) {
-      currentRoomId = generateRoomId();
-      setRoomIdInUrl(currentRoomId);
+      setRoomError('Sala não encontrada. Use o modo "Criar" para criar uma nova sala.');
+      return;
     }
     setRoomId(currentRoomId);
 
     setupSocketListeners(currentUserId, name);
-    
     await initializeMedia();
     
-    // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
-    setTimeout(() => {
-      const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-      if (isChrome) {
-        setShowAudioWarning(true);
-      }
-    }, 3000); // Mostrar após 3 segundos
+    // Tentar entrar na sala
+    socket.emit('join-room', currentRoomId, currentUserId, name, password);
+  };
+
+  const handleCreateRoom = async (name, password = '') => {
+    setRoomError('');
+    setUserName(name);
     
-    socket.emit('join-room', currentRoomId, currentUserId, name);
+    const currentUserId = generateUserId();
+    setUserId(currentUserId);
+
+    const newRoomId = generateRoomId();
+    setRoomId(newRoomId);
+
+    setupSocketListeners(currentUserId, name);
+    await initializeMedia();
+    
+    // Criar nova sala
+    socket.emit('create-room', newRoomId, currentUserId, name, password);
   };
 
   useEffect(() => {
@@ -189,6 +199,36 @@ const VideoCall = () => {
   };
 
   const setupSocketListeners = (currentUserId, currentUserName) => {
+    // Listeners para room management
+    socket.on('room-created', (roomId) => {
+      setRoomIdInUrl(roomId);
+      setShowNameModal(false);
+      
+      // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
+      setTimeout(() => {
+        const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+        if (isChrome) {
+          setShowAudioWarning(true);
+        }
+      }, 3000);
+    });
+
+    socket.on('room-joined', (roomId, isOwner) => {
+      setShowNameModal(false);
+      
+      // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
+      setTimeout(() => {
+        const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+        if (isChrome) {
+          setShowAudioWarning(true);
+        }
+      }, 3000);
+    });
+
+    socket.on('room-error', (error) => {
+      setRoomError(error);
+    });
+
     socket.on('user-connected', async (remoteUserId, remoteUserName) => {
       console.log(`[${currentUserId}] Usuário conectado: ${remoteUserId} (${remoteUserName})`);
       
@@ -748,6 +788,8 @@ const VideoCall = () => {
         <NameModal 
           isOpen={showNameModal}
           onEnter={handleEnterRoom}
+          onCreateRoom={handleCreateRoom}
+          roomError={roomError}
         />
 
         {/* Screen Share Audio Info */}
