@@ -2,6 +2,7 @@ const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const server = createServer(app);
@@ -19,28 +20,79 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Estrutura: roomId -> { users: Set, password: hashedPassword, createdAt: timestamp, owner: userId }
 const rooms = new Map();
+const SALT_ROUNDS = 10;
 
 io.on('connection', (socket) => {
   console.log('Usuário conectado:', socket.id);
 
-  socket.on('join-room', (roomId, userId, userName) => {
-    console.log(`Usuário ${userId} (${userName}) entrando na sala ${roomId}`);
+  // Criar sala com senha opcional
+  socket.on('create-room', async (roomId, userId, userName, password) => {
+    console.log(`Usuário ${userId} (${userName}) criando sala ${roomId} ${password ? 'com senha' : 'pública'}`);
     
+    if (rooms.has(roomId)) {
+      socket.emit('room-error', 'Sala já existe');
+      return;
+    }
+
+    let hashedPassword = null;
+    if (password && password.trim() !== '') {
+      hashedPassword = await bcrypt.hash(password.trim(), SALT_ROUNDS);
+    }
+
+    // Criar nova sala
+    rooms.set(roomId, {
+      users: new Set([userId]),
+      password: hashedPassword,
+      createdAt: Date.now(),
+      owner: userId
+    });
+
     socket.join(roomId);
     socket.userId = userId;
     socket.userName = userName || 'Usuário';
     socket.roomId = roomId;
 
-    if (!rooms.has(roomId)) {
-      rooms.set(roomId, new Set());
-    }
-    
-    const existingUsers = Array.from(rooms.get(roomId));
-    rooms.get(roomId).add(userId);
+    socket.emit('room-created', roomId);
+    console.log(`Sala ${roomId} criada por ${userName}`);
+  });
 
-    const roomUsers = Array.from(rooms.get(roomId));
-    console.log(`Usuários na sala ${roomId}:`, roomUsers);
+  // Entrar em sala existente
+  socket.on('join-room', async (roomId, userId, userName, password = '') => {
+    console.log(`Usuário ${userId} (${userName}) tentando entrar na sala ${roomId}`);
+    
+    // Verificar se sala existe
+    if (!rooms.has(roomId)) {
+      socket.emit('room-error', 'Sala não encontrada');
+      return;
+    }
+
+    const room = rooms.get(roomId);
+
+    // Verificar senha se necessário
+    if (room.password) {
+      if (!password || password.trim() === '') {
+        socket.emit('room-error', 'Senha necessária');
+        return;
+      }
+
+      const isPasswordValid = await bcrypt.compare(password.trim(), room.password);
+      if (!isPasswordValid) {
+        socket.emit('room-error', 'Senha incorreta');
+        return;
+      }
+    }
+
+    socket.join(roomId);
+    socket.userId = userId;
+    socket.userName = userName || 'Usuário';
+    socket.roomId = roomId;
+
+    const existingUsers = Array.from(room.users);
+    room.users.add(userId);
+
+    console.log(`Usuários na sala ${roomId}:`, Array.from(room.users));
 
     // Notificar todos os usuários existentes sobre o novo usuário
     socket.to(roomId).emit('user-connected', userId, userName);
@@ -48,7 +100,6 @@ io.on('connection', (socket) => {
     // Para o novo usuário, enviar eventos individuais para cada usuário existente
     existingUsers.forEach(existingUserId => {
       if (existingUserId !== userId) {
-        // Encontrar o nome do usuário existente
         const existingSocket = Array.from(io.sockets.sockets.values())
           .find(s => s.userId === existingUserId && s.roomId === roomId);
         const existingUserName = existingSocket?.userName || 'Usuário';
@@ -57,6 +108,8 @@ io.on('connection', (socket) => {
         socket.emit('user-connected', existingUserId, existingUserName);
       }
     });
+
+    socket.emit('room-joined', roomId, room.owner === userId);
   });
 
   socket.on('offer', (offer, targetUserId) => {
@@ -137,8 +190,9 @@ io.on('connection', (socket) => {
     if (socket.roomId && socket.userId) {
       const room = rooms.get(socket.roomId);
       if (room) {
-        room.delete(socket.userId);
-        if (room.size === 0) {
+        room.users.delete(socket.userId);
+        if (room.users.size === 0) {
+          console.log(`Sala ${socket.roomId} vazia, removendo...`);
           rooms.delete(socket.roomId);
         }
       }
