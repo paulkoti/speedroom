@@ -11,7 +11,7 @@ const ControlPanel = ({
   onLeaveRoom 
 }) => {
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-40">
       <div className="flex gap-2 md:gap-4 bg-gray-900/95 backdrop-blur-sm rounded-2xl px-4 md:px-6 py-3 md:py-4 shadow-2xl border border-gray-700/50">
         <button
           onClick={onToggleAudio}

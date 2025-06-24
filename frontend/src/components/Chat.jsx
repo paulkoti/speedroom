@@ -44,7 +44,7 @@ const Chat = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed top-0 right-0 h-full w-full md:w-80 bg-gray-900/95 backdrop-blur-sm border-l border-gray-700/50 z-40 flex flex-col">
+    <div className="fixed top-0 right-0 h-full w-full md:w-80 bg-gray-900/95 backdrop-blur-sm border-l border-gray-700/50 z-60 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700/50">
         <div className="flex items-center gap-3">
@@ -109,7 +109,7 @@ const Chat = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-700/50">
+      <div className="p-4 border-t border-gray-700/50 pb-20 md:pb-4">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             ref={inputRef}
