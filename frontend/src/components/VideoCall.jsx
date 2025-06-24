@@ -227,58 +227,102 @@ const VideoCall = () => {
     if (isScreenSharing) {
       // Parar compartilhamento de tela
       let success = false;
+      
+      // Parar compartilhamento para todos os peers
       for (const [, peer] of peersRef.current) {
         const result = await peer.stopScreenShare();
         if (result) success = true;
       }
       
-      if (success || peersRef.current.size === 0) {
-        // Se não há peers, ainda precisamos parar localmente
-        if (localStream && localStream.getTracks().some(track => track.kind === 'video' && track.label.includes('screen'))) {
-          localStream.getTracks().forEach(track => {
-            if (track.kind === 'video') track.stop();
-          });
-          await initializeMedia();
+      // Restaurar stream local também
+      if (localStream && localStream.getTracks().some(track => track.kind === 'video' && track.label.includes('screen'))) {
+        // Parar stream de compartilhamento
+        localStream.getTracks().forEach(track => track.stop());
+        
+        // Reinicializar mídia da câmera
+        await initializeMedia();
+        
+        // Atualizar tracks em todas as conexões peer
+        const newStream = localStreamRef.current;
+        if (newStream) {
+          for (const [, peer] of peersRef.current) {
+            const videoTrack = newStream.getVideoTracks()[0];
+            const sender = peer.peerConnection.getSenders().find(s => 
+              s.track && s.track.kind === 'video'
+            );
+            
+            if (sender && videoTrack) {
+              await sender.replaceTrack(videoTrack);
+            }
+          }
         }
+        
+        success = true;
+      }
+      
+      if (success) {
         setIsScreenSharing(false);
       }
     } else {
       // Iniciar compartilhamento de tela
-      let success = false;
-      for (const [, peer] of peersRef.current) {
-        const result = await peer.startScreenShare();
-        if (result) success = true;
-      }
-      
-      if (success || peersRef.current.size === 0) {
-        // Se não há peers, ainda vamos tentar compartilhar localmente
-        if (peersRef.current.size === 0) {
-          try {
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({
-              video: true,
-              audio: true
-            });
-            
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = screenStream;
-            }
-            setLocalStream(screenStream);
-            localStreamRef.current = screenStream;
-            
-            screenStream.getVideoTracks()[0].onended = () => {
-              setIsScreenSharing(false);
-              initializeMedia();
-            };
-            
-            success = true;
-          } catch (error) {
-            console.error('Erro ao compartilhar tela:', error);
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+        
+        // Armazenar stream original antes de substituir
+        const originalStream = localStreamRef.current;
+        
+        // Atualizar vídeo local
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStream;
+        }
+        setLocalStream(screenStream);
+        localStreamRef.current = screenStream;
+        
+        // Substituir tracks em todas as conexões peer
+        const videoTrack = screenStream.getVideoTracks()[0];
+        for (const [, peer] of peersRef.current) {
+          // Armazenar stream original no peer
+          if (!peer.originalStream && originalStream) {
+            peer.originalStream = originalStream;
+          }
+          
+          const sender = peer.peerConnection.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+          );
+          
+          if (sender) {
+            await sender.replaceTrack(videoTrack);
           }
         }
         
-        if (success) {
-          setIsScreenSharing(true);
-        }
+        // Listener para quando o usuário para de compartilhar via browser
+        videoTrack.onended = async () => {
+          setIsScreenSharing(false);
+          
+          // Restaurar câmera quando compartilhamento para
+          await initializeMedia();
+          
+          const newStream = localStreamRef.current;
+          if (newStream) {
+            for (const [, peer] of peersRef.current) {
+              const newVideoTrack = newStream.getVideoTracks()[0];
+              const sender = peer.peerConnection.getSenders().find(s => 
+                s.track && s.track.kind === 'video'
+              );
+              
+              if (sender && newVideoTrack) {
+                await sender.replaceTrack(newVideoTrack);
+              }
+            }
+          }
+        };
+        
+        setIsScreenSharing(true);
+      } catch (error) {
+        console.error('Erro ao compartilhar tela:', error);
       }
     }
   };
