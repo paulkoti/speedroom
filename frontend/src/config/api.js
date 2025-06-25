@@ -14,17 +14,11 @@ export const API_BASE_URL = (() => {
     return 'http://localhost:3003';
   }
   
-  // Production mode - use same domain with different port or subdomain
-  const protocol = window.location.protocol;
+  // Production mode - always use HTTP for API on port 3003
   const hostname = window.location.hostname;
   
-  // If on speedroom.sovxeo.shop, try api.speedroom.sovxeo.shop or same domain with port 3003
-  if (hostname.includes('speedroom.sovxeo.shop')) {
-    return `${protocol}//api.speedroom.sovxeo.shop`;
-  }
-  
-  // Fallback: same domain with port 3003
-  return `${protocol}//${hostname}:3003`;
+  // For speedroom.sovxeo.shop, use HTTP with port 3003
+  return `http://${hostname}:3003`;
 })();
 
 console.log('🔗 API Base URL:', API_BASE_URL);
