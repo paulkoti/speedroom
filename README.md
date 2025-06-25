@@ -1,78 +1,311 @@
-# Speed Room
+# 🎥 SpeedRoom
 
-Aplicativo de videoconferência instantânea que permite criar salas de vídeo rapidamente e compartilhá-las via URL.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8.1-black.svg)](https://socket.io/)
 
-## Funcionalidades
+> **Videoconferência instantânea e simples** - Crie salas de vídeo em segundos e compartilhe via URL
 
-- 🚀 Criação automática de sala ao acessar o site
-- 📹 Videoconferência em tempo real com WebRTC
-- 🎤 Controles de áudio e vídeo
-- 🔗 Compartilhamento fácil via URL
-- 📱 Layout responsivo
-- ⚡ Interface minimalista e rápida
+SpeedRoom é uma aplicação moderna de videoconferência que permite criar e participar de reuniões de vídeo através de URLs simples. Construído com WebRTC para comunicação P2P de alta qualidade, React para interface responsiva e Node.js + Socket.IO para sinalização em tempo real.
 
-## Como Usar
+## ✨ Funcionalidades
 
-1. **Instalar dependências:**
-   ```bash
-   npm install
-   ```
+### 🎥 **Core de Videoconferência**
+- ⚡ **Criação instantânea de salas** - Sem cadastro necessário
+- 📹 **Vídeo HD em tempo real** - WebRTC P2P nativo
+- 🎤 **Controles de áudio/vídeo** - Mute/unmute intuitivo
+- 🖥️ **Compartilhamento de tela** - Screen sharing completo
+- 💬 **Chat integrado** - Mensagens durante a chamada
+- 🔒 **Salas protegidas por senha** - Privacidade opcional
 
-2. **Iniciar em modo desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
-   
-   Isso iniciará tanto o frontend (porta 5173) quanto o backend (porta 3001).
+### 📱 **Interface Avançada**
+- 🎨 **Layouts flexíveis** - Grid, foco, picture-in-picture
+- 📱 **Design responsivo** - Funciona em mobile e desktop
+- 🌙 **Interface moderna** - Dark theme profissional
+- 🚀 **Performance otimizada** - Lazy loading de componentes
 
-3. **Acessar o aplicativo:**
-   - Abra `http://localhost:5173`
-   - Uma sala será criada automaticamente
-   - Compartilhe a URL com outros usuários para que se juntem à chamada
+### 🛠️ **Administração**
+- 📊 **Dashboard administrativo** - Métricas em tempo real
+- 📈 **Analytics avançados** - Sessões, usuários, performance
+- 📋 **Relatórios exportáveis** - CSV e JSON
+- 🧹 **Gestão automática de memória** - Sistema anti-leak
 
-## Estrutura do Projeto
+## 🚀 Quick Start
 
+### Pré-requisitos
+- Node.js 18+ 
+- npm ou yarn
+- Navegador moderno com suporte a WebRTC
+
+### 🏃‍♂️ Instalação Rápida
+
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/speedroom.git
+cd speedroom
+
+# Instalação automática
+chmod +x setup.sh
+./setup.sh
+
+# Iniciar em desenvolvimento
+npm run dev
+```
+
+Acesse `http://localhost:5173` e comece a usar! 🎉
+
+### ⚙️ Instalação Manual
+
+```bash
+# Instalar dependências
+npm install
+
+# Instalar dependências do frontend
+cd frontend && npm install && cd ..
+
+# Instalar dependências do backend  
+cd backend && npm install && cd ..
+
+# Iniciar aplicação
+npm run dev
+```
+
+## 📖 Uso
+
+### 🎬 **Criando uma Reunião**
+1. Acesse a aplicação
+2. Digite seu nome
+3. Clique em "Criar Sala"
+4. Compartilhe a URL com os participantes
+
+### 🚪 **Entrando em uma Reunião**
+1. Acesse o link da sala
+2. Digite seu nome
+3. Clique em "Entrar"
+4. Permita acesso à câmera/microfone
+
+### 🔧 **Controles Disponíveis**
+- **Áudio/Vídeo**: Liga/desliga câmera e microfone
+- **Tela**: Compartilha sua tela
+- **Chat**: Abre painel de mensagens
+- **Layout**: Alterna entre visualizações
+- **Qualidade**: Monitora conexão
+
+## 🛠️ Configuração Avançada
+
+### 📁 **Estrutura do Projeto**
 ```
 speedroom/
-├── frontend/          # React + Vite + Tailwind
+├── 📦 package.json              # Scripts principais
+├── 🌐 frontend/                 # React SPA
 │   ├── src/
-│   │   ├── components/    # Componentes React
-│   │   ├── hooks/         # Custom hooks
-│   │   └── utils/         # Utilitários WebRTC
+│   │   ├── components/          # Componentes React
+│   │   ├── hooks/               # Custom hooks
+│   │   ├── utils/               # WebRTC utilities
+│   │   └── contexts/            # State management
 │   └── package.json
-├── backend/           # Node.js + Socket.IO
-│   ├── server.js         # Servidor de sinalização
+├── 🖥️ backend/                  # Node.js Server
+│   ├── server.js               # Socket.IO + Express
 │   └── package.json
-└── package.json       # Scripts principais
+├── 🚀 scripts/                 # Setup e deploy
+├── 📚 docs/                    # Documentação
+└── 🐳 docker-compose.yml      # Container setup
 ```
 
-## Tecnologias
+### 🔧 **Variáveis de Ambiente**
 
-- **Frontend:** React, Vite, Tailwind CSS, Socket.IO Client
-- **Backend:** Node.js, Express, Socket.IO
-- **WebRTC:** API nativa do navegador para P2P
-- **STUN Servers:** Google STUN para NAT traversal
+Crie um arquivo `.env` no backend:
 
-## Deploy
+```env
+# Servidor
+PORT=3003
+NODE_ENV=production
 
-Para deploy em produção:
+# Admin Dashboard
+ADMIN_USERNAME=speedroom_admin
+ADMIN_PASSWORD_HASH=your_bcrypt_hash_here
+SESSION_SECRET=your_session_secret_here
 
-1. **Build do frontend:**
-   ```bash
-   npm run build
-   ```
+# CORS
+FRONTEND_URL=https://yourdomain.com
+ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+```
 
-2. **Configurar variáveis de ambiente:**
-   - `PORT`: Porta do servidor (default: 3001)
-   - Ajustar URL do Socket.IO no frontend para o domínio de produção
+### 🔐 **Configuração de Administrador**
 
-3. **Iniciar servidor:**
-   ```bash
-   npm start
-   ```
+```bash
+# Gerar hash de senha para admin
+npm run generate-admin-hash "SuaSenhaSegura123!"
 
-## Desenvolvimento
+# Acessar dashboard
+https://seudominio.com/dashboard
+```
 
-- **Frontend:** `npm run dev:frontend`
-- **Backend:** `npm run dev:backend`
-- **Ambos:** `npm run dev`
+## 🚀 Deploy em Produção
+
+### 🐳 **Docker (Recomendado)**
+
+```bash
+# Build e start
+docker-compose up -d
+
+# Logs
+docker-compose logs -f
+```
+
+### 🌐 **Deploy Manual VPS**
+
+```bash
+# Preparar servidor
+chmod +x deploy.sh
+sudo ./deploy.sh
+
+# Configurar domínio no script
+nano deploy.sh  # Alterar DOMAIN="seudominio.com"
+
+# SSL automático
+sudo certbot --nginx -d seudominio.com
+```
+
+### ☁️ **Deploy em Plataformas**
+
+<details>
+<summary><b>Vercel + Railway</b></summary>
+
+#### Frontend (Vercel)
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Deploy frontend
+cd frontend
+vercel --prod
+```
+
+#### Backend (Railway)
+1. Conecte seu GitHub no Railway
+2. Selecione a pasta `backend`
+3. Configure as variáveis de ambiente
+4. Deploy automático
+
+</details>
+
+<details>
+<summary><b>Heroku</b></summary>
+
+```bash
+# Criar apps
+heroku create speedroom-frontend
+heroku create speedroom-backend
+
+# Deploy backend
+cd backend
+git init
+heroku git:remote -a speedroom-backend
+git add . && git commit -m "Deploy"
+git push heroku main
+
+# Configurar variáveis
+heroku config:set NODE_ENV=production
+```
+
+</details>
+
+## 🔧 Desenvolvimento
+
+### 🏃‍♂️ **Scripts Disponíveis**
+
+```bash
+# Desenvolvimento
+npm run dev              # Frontend + Backend
+npm run dev:frontend     # Apenas frontend
+npm run dev:backend      # Apenas backend
+
+# Build
+npm run build           # Build frontend
+npm run start           # Produção
+
+# Utilidades
+npm run lint            # ESLint
+npm run clean           # Limpar node_modules
+npm run setup           # Setup completo
+```
+
+### 🧪 **Testes**
+
+```bash
+# Executar testes
+npm test
+
+# Testes com coverage
+npm run test:coverage
+
+# Testes E2E
+npm run test:e2e
+```
+
+### 🛠️ **Ferramentas de Desenvolvimento**
+
+- **ESLint** - Linting de código
+- **Prettier** - Formatação automática  
+- **Nodemon** - Hot reload backend
+- **Vite** - Dev server frontend
+- **PM2** - Process manager produção
+
+## 📊 APIs
+
+### 🔓 **Endpoints Públicos**
+```http
+GET  /                          # Frontend SPA
+GET  /health                    # Health check
+POST /api/rooms                 # Criar sala
+```
+
+### 🔒 **Endpoints Administrativos**
+```http
+POST /api/auth/login           # Login admin
+GET  /api/dashboard/stats      # Estatísticas
+GET  /api/performance/metrics  # Métricas de performance
+GET  /api/reports/usage        # Relatórios de uso
+POST /api/memory/cleanup       # Limpeza manual
+```
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie sua feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para guidelines detalhadas.
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🙏 Agradecimentos
+
+- [WebRTC](https://webrtc.org/) - Comunicação P2P
+- [Socket.IO](https://socket.io/) - Real-time communication
+- [React](https://reactjs.org/) - Interface de usuário
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Vite](https://vitejs.dev/) - Build tool
+
+## 📞 Suporte
+
+- 📖 **Documentação**: [docs/](docs/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/seu-usuario/speedroom/issues)
+- 💬 **Discussões**: [GitHub Discussions](https://github.com/seu-usuario/speedroom/discussions)
+- 📧 **Email**: speedroom@seudominio.com
+
+---
+
+<div align="center">
+
+**⭐ Se este projeto te ajudou, dê uma estrela no GitHub! ⭐**
+
+[⬆ Voltar ao topo](#-speedroom)
+
+</div>

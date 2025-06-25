@@ -11,7 +11,11 @@
       "Bash(npm run build:*)",
       "Bash(npm run lint)",
       "Bash(curl:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(cp:*)",
+      "Bash(grep:*)",
+      "Bash(git push:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }

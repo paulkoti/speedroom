@@ -755,6 +755,27 @@ app.post('/api/memory/cleanup', requireAuth, (req, res) => {
   });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  const uptime = process.uptime();
+  const memUsage = process.memoryUsage();
+  
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: uptime,
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024), // MB
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024), // MB
+      external: Math.round(memUsage.external / 1024 / 1024) // MB
+    },
+    activeConnections: io.sockets.sockets.size,
+    activeRooms: rooms.size,
+    activeSessions: Array.from(sessions.values()).filter(s => !s.endTime).length
+  });
+});
+
 // Start memory cleanup interval (every 15 minutes for production)
 setInterval(performMemoryCleanup, 15 * 60 * 1000);
 
