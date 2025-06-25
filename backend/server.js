@@ -3,6 +3,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const session = require('express-session');
 
 const app = express();
 const server = createServer(app);
@@ -20,9 +21,139 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Session middleware for dashboard auth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'speedroom-dashboard-secret-2024',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
 // Estrutura: roomId -> { users: Set, password: hashedPassword, createdAt: timestamp, owner: userId }
 const rooms = new Map();
 const SALT_ROUNDS = 10;
+
+// Dashboard Admin Credentials (in production, store in environment variables)
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'speedroom_admin';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$4D0AbrWw/voC6ds4PmsxwOLfZHjwuV53R6Vh7Qaz4xnlfZH5rAGdq'; // Default: 'SpeedRoom@Admin2024!'
+
+// Generate hash for default password if needed
+const generateDefaultPasswordHash = async () => {
+  if (!process.env.ADMIN_PASSWORD_HASH) {
+    const defaultPassword = 'SpeedRoom@Admin2024!';
+    const hash = await bcrypt.hash(defaultPassword, SALT_ROUNDS);
+    console.log('🔐 Admin credentials:');
+    console.log('   Username: speedroom_admin');
+    console.log('   Password: SpeedRoom@Admin2024!');
+    console.log('   Hash (for production):', hash);
+    return hash;
+  }
+  return process.env.ADMIN_PASSWORD_HASH;
+};
+
+// Auth middleware for dashboard routes
+const requireAuth = (req, res, next) => {
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Authentication required' });
+};
+
+// Sistema de Métricas e Analytics
+const sessions = new Map(); // sessionId -> session data
+const roomMetrics = new Map(); // roomId -> room metrics
+const globalStats = {
+  totalRooms: 0,
+  totalSessions: 0,
+  totalMessages: 0,
+  peakConcurrentUsers: 0,
+  serverStartTime: Date.now()
+};
+
+// Metrics Collection Functions
+function createSession(socket, roomId, userId, userName) {
+  const sessionId = `${userId}_${Date.now()}`;
+  const session = {
+    sessionId,
+    roomId,
+    userId,
+    userName,
+    startTime: Date.now(),
+    endTime: null,
+    duration: 0,
+    messagesCount: 0,
+    joined: Date.now()
+  };
+  
+  sessions.set(sessionId, session);
+  socket.sessionId = sessionId;
+  globalStats.totalSessions++;
+  
+  // Update room metrics
+  if (!roomMetrics.has(roomId)) {
+    roomMetrics.set(roomId, {
+      roomId,
+      createdAt: Date.now(),
+      totalParticipants: 0,
+      peakParticipants: 0,
+      totalMessages: 0,
+      totalDuration: 0,
+      sessions: []
+    });
+  }
+  
+  const roomMetric = roomMetrics.get(roomId);
+  roomMetric.totalParticipants++;
+  roomMetric.sessions.push(sessionId);
+  
+  return session;
+}
+
+function endSession(socket) {
+  if (!socket.sessionId) return;
+  
+  const session = sessions.get(socket.sessionId);
+  if (session) {
+    session.endTime = Date.now();
+    session.duration = session.endTime - session.startTime;
+    
+    // Update room metrics
+    const roomMetric = roomMetrics.get(session.roomId);
+    if (roomMetric) {
+      roomMetric.totalDuration += session.duration;
+    }
+  }
+}
+
+function updateGlobalStats() {
+  const currentUsers = Array.from(io.sockets.sockets.values()).length;
+  if (currentUsers > globalStats.peakConcurrentUsers) {
+    globalStats.peakConcurrentUsers = currentUsers;
+  }
+}
+
+function getRoomStats(roomId) {
+  const room = rooms.get(roomId);
+  const metrics = roomMetrics.get(roomId);
+  if (!room || !metrics) return null;
+  
+  const activeSessions = Array.from(sessions.values())
+    .filter(s => s.roomId === roomId && !s.endTime);
+  
+  metrics.currentParticipants = room.users.size;
+  if (room.users.size > metrics.peakParticipants) {
+    metrics.peakParticipants = room.users.size;
+  }
+  
+  return {
+    ...metrics,
+    activeSessions: activeSessions.length,
+    currentUsers: Array.from(room.users)
+  };
+}
 
 io.on('connection', (socket) => {
   console.log('Usuário conectado:', socket.id);
@@ -53,6 +184,11 @@ io.on('connection', (socket) => {
     socket.userId = userId;
     socket.userName = userName || 'Usuário';
     socket.roomId = roomId;
+
+    // Create session for metrics
+    createSession(socket, roomId, userId, userName);
+    globalStats.totalRooms++;
+    updateGlobalStats();
 
     socket.emit('room-created', roomId);
     console.log(`Sala ${roomId} criada por ${userName}`);
@@ -91,6 +227,10 @@ io.on('connection', (socket) => {
 
     const existingUsers = Array.from(room.users);
     room.users.add(userId);
+
+    // Create session for metrics
+    createSession(socket, roomId, userId, userName);
+    updateGlobalStats();
 
     console.log(`Usuários na sala ${roomId}:`, Array.from(room.users));
 
@@ -172,11 +312,53 @@ io.on('connection', (socket) => {
     }
   });
 
+  // WebRTC Quality Stats
+  socket.on('webrtc-stats', (stats) => {
+    if (!socket.sessionId) return;
+    
+    const session = sessions.get(socket.sessionId);
+    if (session) {
+      if (!session.qualityStats) {
+        session.qualityStats = [];
+      }
+      
+      // Store quality metrics with timestamp
+      session.qualityStats.push({
+        timestamp: Date.now(),
+        ...stats
+      });
+      
+      // Keep only last 50 stats entries per session
+      if (session.qualityStats.length > 50) {
+        session.qualityStats = session.qualityStats.slice(-50);
+      }
+      
+      // Broadcast quality stats to room for real-time monitoring
+      socket.to(socket.roomId).emit('user-quality-update', {
+        userId: socket.userId,
+        userName: socket.userName,
+        stats: stats
+      });
+    }
+  });
+
   socket.on('chat-message', (message, roomId) => {
     console.log(`Mensagem de chat de ${message.userName} na sala ${roomId}:`, message.message);
     
     // Verificar se o usuário está na sala
     if (socket.roomId === roomId) {
+      // Update metrics
+      globalStats.totalMessages++;
+      const roomMetric = roomMetrics.get(roomId);
+      if (roomMetric) {
+        roomMetric.totalMessages++;
+      }
+      
+      const session = sessions.get(socket.sessionId);
+      if (session) {
+        session.messagesCount++;
+      }
+      
       // Repassar mensagem para todos os outros usuários na sala
       socket.to(roomId).emit('chat-message', message);
     } else {
@@ -186,6 +368,9 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Usuário desconectado:', socket.id);
+    
+    // End session for metrics
+    endSession(socket);
     
     if (socket.roomId && socket.userId) {
       const room = rooms.get(socket.roomId);
@@ -201,7 +386,197 @@ io.on('connection', (socket) => {
   });
 });
 
+// Auth Routes
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  
+  try {
+    // Check username
+    if (username !== ADMIN_USERNAME) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Get current password hash
+    const currentHash = await generateDefaultPasswordHash();
+    
+    // Verify password
+    const isValid = await bcrypt.compare(password, currentHash);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Set session
+    req.session.authenticated = true;
+    req.session.username = username;
+    
+    res.json({ 
+      success: true, 
+      message: 'Login successful',
+      user: { username }
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.json({ success: true, message: 'Logout successful' });
+  });
+});
+
+app.get('/api/auth/check', (req, res) => {
+  if (req.session && req.session.authenticated) {
+    res.json({ 
+      authenticated: true, 
+      user: { username: req.session.username }
+    });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
+// API Routes for Dashboard (Protected)
+app.get('/api/dashboard/stats', requireAuth, (req, res) => {
+  const currentTime = Date.now();
+  const uptimeMs = currentTime - globalStats.serverStartTime;
+  
+  const activeRooms = Array.from(rooms.keys()).map(roomId => getRoomStats(roomId)).filter(Boolean);
+  const activeSessions = Array.from(sessions.values()).filter(s => !s.endTime);
+  const completedSessions = Array.from(sessions.values()).filter(s => s.endTime);
+  
+  const avgSessionDuration = completedSessions.length > 0
+    ? completedSessions.reduce((sum, s) => sum + s.duration, 0) / completedSessions.length
+    : 0;
+
+  res.json({
+    global: {
+      ...globalStats,
+      uptime: uptimeMs,
+      currentUsers: Array.from(io.sockets.sockets.values()).length,
+      activeRooms: activeRooms.length,
+      activeSessions: activeSessions.length,
+      avgSessionDuration: Math.round(avgSessionDuration / 1000 / 60) // minutes
+    },
+    rooms: activeRooms,
+    recentSessions: completedSessions.slice(-10).reverse()
+  });
+});
+
+app.get('/api/dashboard/room/:roomId', requireAuth, (req, res) => {
+  const { roomId } = req.params;
+  const roomStats = getRoomStats(roomId);
+  
+  if (!roomStats) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+  
+  const roomSessions = Array.from(sessions.values())
+    .filter(s => s.roomId === roomId)
+    .sort((a, b) => b.startTime - a.startTime);
+  
+  res.json({
+    ...roomStats,
+    sessions: roomSessions
+  });
+});
+
+// Reports API (Protected)
+app.get('/api/reports/usage', requireAuth, (req, res) => {
+  const { period = '24h', format = 'json' } = req.query;
+  
+  const now = Date.now();
+  let startTime;
+  
+  switch (period) {
+    case '1h': startTime = now - (60 * 60 * 1000); break;
+    case '24h': startTime = now - (24 * 60 * 60 * 1000); break;
+    case '7d': startTime = now - (7 * 24 * 60 * 60 * 1000); break;
+    case '30d': startTime = now - (30 * 24 * 60 * 60 * 1000); break;
+    default: startTime = now - (24 * 60 * 60 * 1000);
+  }
+  
+  const filteredSessions = Array.from(sessions.values())
+    .filter(s => s.startTime >= startTime);
+  
+  const filteredRooms = Array.from(roomMetrics.values())
+    .filter(r => r.createdAt >= startTime);
+  
+  const report = {
+    period,
+    startTime,
+    endTime: now,
+    summary: {
+      totalSessions: filteredSessions.length,
+      totalRooms: filteredRooms.length,
+      totalUsers: [...new Set(filteredSessions.map(s => s.userId))].length,
+      totalMessages: filteredSessions.reduce((sum, s) => sum + (s.messagesCount || 0), 0),
+      avgSessionDuration: filteredSessions.length > 0 
+        ? filteredSessions.reduce((sum, s) => sum + (s.duration || 0), 0) / filteredSessions.length
+        : 0,
+      peakConcurrentUsers: globalStats.peakConcurrentUsers
+    },
+    sessions: filteredSessions.sort((a, b) => b.startTime - a.startTime),
+    rooms: filteredRooms.sort((a, b) => b.createdAt - a.createdAt)
+  };
+  
+  if (format === 'csv') {
+    // Simple CSV export
+    let csv = 'Session ID,User ID,User Name,Room ID,Start Time,Duration (min),Messages\n';
+    filteredSessions.forEach(session => {
+      csv += `${session.sessionId},${session.userId},${session.userName},${session.roomId},${new Date(session.startTime).toISOString()},${Math.round((session.duration || 0) / 1000 / 60)},${session.messagesCount || 0}\n`;
+    });
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="usage-report-${period}.csv"`);
+    return res.send(csv);
+  }
+  
+  res.json(report);
+});
+
+// Performance Monitoring API (Protected)
+app.get('/api/performance/metrics', requireAuth, (req, res) => {
+  const processMemory = process.memoryUsage();
+  const uptime = process.uptime();
+  
+  const metrics = {
+    timestamp: Date.now(),
+    server: {
+      uptime: uptime * 1000, // Convert to ms
+      memory: {
+        rss: processMemory.rss,
+        heapTotal: processMemory.heapTotal,
+        heapUsed: processMemory.heapUsed,
+        external: processMemory.external
+      },
+      cpu: process.cpuUsage()
+    },
+    application: {
+      activeConnections: io.sockets.sockets.size,
+      activeSessions: Array.from(sessions.values()).filter(s => !s.endTime).length,
+      activeRooms: rooms.size,
+      totalMemoryMB: Math.round(processMemory.heapUsed / 1024 / 1024),
+      memoryPercentage: Math.round((processMemory.heapUsed / processMemory.heapTotal) * 100)
+    },
+    stats: globalStats
+  };
+  
+  res.json(metrics);
+});
+
 const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Dashboard API disponível em http://localhost:${PORT}/api/dashboard/stats`);
 });

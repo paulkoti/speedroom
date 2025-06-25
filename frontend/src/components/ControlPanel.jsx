@@ -8,6 +8,8 @@ const ControlPanel = ({
   onToggleChat,
   isChatOpen,
   unreadMessages,
+  onToggleQuality,
+  showQualityPanel,
   onLeaveRoom 
 }) => {
   return (
@@ -92,6 +94,30 @@ const ControlPanel = ({
               {unreadMessages > 9 ? '9+' : unreadMessages}
             </div>
           )}
+        </button>
+
+        <button
+          onClick={onToggleQuality}
+          className={`p-3 md:p-4 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg ${
+            showQualityPanel 
+              ? 'bg-purple-600/90 hover:bg-purple-500/90 text-white shadow-purple-500/25' 
+              : 'bg-gray-700/80 hover:bg-gray-600/80 text-white'
+          }`}
+          title={showQualityPanel ? 'Fechar qualidade' : 'Ver qualidade da conexão'}
+        >
+          <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        </button>
+
+        <button
+          onClick={() => window.open('/dashboard', '_blank')}
+          className="p-3 md:p-4 rounded-xl bg-gray-700/80 hover:bg-gray-600/80 text-white transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg"
+          title="Dashboard"
+        >
+          <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+          </svg>
         </button>
 
         <button

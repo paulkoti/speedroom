@@ -10,6 +10,7 @@ import {
   copyRoomUrl 
 } from '../utils/roomUtils';
 import { debounceDOMOperation } from '../utils/debounce';
+import { WebRTCStatsCollector } from '../utils/webrtcStats';
 import ControlPanel from './ControlPanel';
 import VideoGridAdvanced from './VideoGridAdvanced';
 import NameModal from './NameModal';
@@ -19,6 +20,7 @@ const MaximizedVideoModal = lazy(() => import('./MaximizedVideoModal'));
 const Chat = lazy(() => import('./Chat'));
 const LayoutSelector = lazy(() => import('./LayoutSelector'));
 const ParticipantsList = lazy(() => import('./ParticipantsList'));
+const QualityPanel = lazy(() => import('./QualityPanel'));
 
 const VideoCall = () => {
   const { socket, isConnected } = useSocket();
@@ -45,10 +47,13 @@ const VideoCall = () => {
   const [isPiPEnabled, setIsPiPEnabled] = useState(false);
   const [showParticipantsList, setShowParticipantsList] = useState(false);
   const [roomError, setRoomError] = useState('');
+  const [qualityStats, setQualityStats] = useState({});
+  const [showQualityPanel, setShowQualityPanel] = useState(false);
   
   const localVideoRef = useRef();
   const localStreamRef = useRef(null);
   const peersRef = useRef(new Map());
+  const statsCollectorRef = useRef(null);
 
   const handleEnterRoom = useCallback(async (name, password = '') => {
     setRoomError('');
@@ -67,6 +72,9 @@ const VideoCall = () => {
     setupSocketListeners(currentUserId, name);
     await initializeMedia();
     
+    // Initialize WebRTC stats collector
+    statsCollectorRef.current = new WebRTCStatsCollector(socket);
+    
     // Tentar entrar na sala
     socket.emit('join-room', currentRoomId, currentUserId, name, password);
   }, [socket]);
@@ -83,6 +91,9 @@ const VideoCall = () => {
 
     setupSocketListeners(currentUserId, name);
     await initializeMedia();
+    
+    // Initialize WebRTC stats collector
+    statsCollectorRef.current = new WebRTCStatsCollector(socket);
     
     // Criar nova sala
     socket.emit('create-room', newRoomId, currentUserId, name, password);
@@ -198,6 +209,11 @@ const VideoCall = () => {
       setRoomIdInUrl(roomId);
       setShowNameModal(false);
       
+      // Start stats collection
+      if (statsCollectorRef.current) {
+        statsCollectorRef.current.startCollection();
+      }
+      
       // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
       setTimeout(() => {
         const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
@@ -209,6 +225,11 @@ const VideoCall = () => {
 
     socket.on('room-joined', (roomId, isOwner) => {
       setShowNameModal(false);
+      
+      // Start stats collection
+      if (statsCollectorRef.current) {
+        statsCollectorRef.current.startCollection();
+      }
       
       // Detectar se o áudio pode ser reproduzido (Chrome autoplay policy)
       setTimeout(() => {
@@ -284,7 +305,23 @@ const VideoCall = () => {
         peer.disconnect();
         peersRef.current.delete(disconnectedUserId);
         setPeers(new Map(peersRef.current));
+        
+        // Remove from stats collector
+        if (statsCollectorRef.current) {
+          statsCollectorRef.current.removePeerConnection(disconnectedUserId);
+        }
       }
+    });
+
+    socket.on('user-quality-update', (data) => {
+      setQualityStats(prev => ({
+        ...prev,
+        [data.userId]: {
+          ...data.stats,
+          userName: data.userName,
+          timestamp: Date.now()
+        }
+      }));
     });
 
     socket.on('chat-message', (message) => {
@@ -330,6 +367,11 @@ const VideoCall = () => {
     peer.userName = remoteUserName;
     peersRef.current.set(remoteUserId, peer);
     setPeers(new Map(peersRef.current));
+    
+    // Add to stats collector
+    if (statsCollectorRef.current) {
+      statsCollectorRef.current.addPeerConnection(remoteUserId, peer.peerConnection);
+    }
     
     console.log(`[${userId}] Total de conexões: ${peersRef.current.size}. Conectado com:`, Array.from(peersRef.current.keys()));
 
@@ -620,11 +662,20 @@ const VideoCall = () => {
     setShowParticipantsList(!showParticipantsList);
   }, [showParticipantsList]);
 
+  const toggleQualityPanel = useCallback(() => {
+    setShowQualityPanel(!showQualityPanel);
+  }, [showQualityPanel]);
+
   const cleanupConnections = () => {
     peersRef.current.forEach(peer => {
       if (peer.disconnect) peer.disconnect();
     });
     peersRef.current.clear();
+    
+    // Stop stats collection
+    if (statsCollectorRef.current) {
+      statsCollectorRef.current.stopCollection();
+    }
     
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
@@ -769,6 +820,8 @@ const VideoCall = () => {
             onToggleChat={toggleChat}
             isChatOpen={isChatOpen}
             unreadMessages={unreadMessages}
+            onToggleQuality={toggleQualityPanel}
+            showQualityPanel={showQualityPanel}
             onLeaveRoom={handleLeaveRoom}
           />
         )}
@@ -878,6 +931,15 @@ const VideoCall = () => {
             isOpen={showParticipantsList}
             onClose={() => setShowParticipantsList(false)}
             onFocusParticipant={handleFocusParticipant}
+          />
+        </Suspense>
+
+        {/* Quality Panel */}
+        <Suspense fallback={<div className="fixed top-20 right-4 bg-gray-800 p-4 rounded-lg"><div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full"></div></div>}>
+          <QualityPanel
+            qualityStats={qualityStats}
+            isOpen={showQualityPanel}
+            onClose={() => setShowQualityPanel(false)}
           />
         </Suspense>
 
