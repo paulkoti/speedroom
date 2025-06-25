@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { API_ENDPOINTS, apiRequest } from '../config/api';
 
 const AuthContext = createContext();
 
@@ -16,9 +17,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:3003/api/auth/check', {
-        credentials: 'include'
-      });
+      const response = await apiRequest(API_ENDPOINTS.CHECK_AUTH);
       const data = await response.json();
       
       if (data.authenticated) {
@@ -40,9 +39,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await fetch('http://localhost:3003/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
+      await apiRequest(API_ENDPOINTS.LOGOUT, {
+        method: 'POST'
       });
     } catch (error) {
       console.error('Logout failed:', error);

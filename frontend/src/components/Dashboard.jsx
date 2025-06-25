@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_ENDPOINTS, apiRequest } from '../config/api';
 
 const Dashboard = memo(() => {
   const { logout } = useAuth();
@@ -12,21 +13,9 @@ const Dashboard = memo(() => {
   const fetchStats = async () => {
     try {
       const [statsResponse, perfResponse] = await Promise.all([
-        fetch('http://localhost:3003/api/dashboard/stats', {
-          credentials: 'include'
-        }),
-        fetch('http://localhost:3003/api/performance/metrics', {
-          credentials: 'include'
-        })
+        apiRequest(API_ENDPOINTS.DASHBOARD_STATS),
+        apiRequest(API_ENDPOINTS.PERFORMANCE_METRICS)
       ]);
-      
-      if (!statsResponse.ok || !perfResponse.ok) {
-        if (statsResponse.status === 401 || perfResponse.status === 401) {
-          logout();
-          return;
-        }
-        throw new Error('Failed to fetch data');
-      }
       
       const statsData = await statsResponse.json();
       const perfData = await perfResponse.json();
@@ -35,6 +24,10 @@ const Dashboard = memo(() => {
       setPerformance(perfData);
       setError(null);
     } catch (err) {
+      if (err.message.includes('401')) {
+        logout();
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -43,9 +36,8 @@ const Dashboard = memo(() => {
 
   const downloadReport = async (period, format) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/reports/usage?period=${period}&format=${format}`, {
-        credentials: 'include'
-      });
+      const response = await apiRequest(`${API_ENDPOINTS.USAGE_REPORTS}?period=${period}&format=${format}`);
+      
       if (!response.ok) {
         if (response.status === 401) {
           logout();

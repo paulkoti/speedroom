@@ -1,4 +1,5 @@
 import { useState, memo } from 'react';
+import { API_ENDPOINTS, apiRequest } from '../config/api';
 
 const Login = memo(({ onLogin }) => {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
@@ -11,24 +12,16 @@ const Login = memo(({ onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3003/api/auth/login', {
+      const response = await apiRequest(API_ENDPOINTS.LOGIN, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify(credentials),
       });
 
       const data = await response.json();
-
-      if (response.ok) {
-        onLogin(data.user);
-      } else {
-        setError(data.error || 'Login failed');
-      }
+      onLogin(data.user);
     } catch (err) {
-      setError('Connection error. Please try again.');
+      const errorMessage = err.message.includes('401') ? 'Credenciais inválidas' : 'Erro de conexão. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
