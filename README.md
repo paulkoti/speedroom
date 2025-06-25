@@ -108,7 +108,7 @@ speedroom/
 ├── 🖥️ backend/                  # Node.js Server
 │   ├── server.js               # Socket.IO + Express
 │   └── package.json
-├── 🚀 scripts/                 # Setup e deploy
+├── 🚀 setup.sh                  # Script de instalação automática
 ├── 📚 docs/                    # Documentação
 └── 🐳 docker-compose.yml      # Container setup
 ```
@@ -157,14 +157,20 @@ docker-compose logs -f
 ### 🌐 **Deploy Manual VPS**
 
 ```bash
-# Preparar servidor
-chmod +x deploy.sh
-sudo ./deploy.sh
+# Preparar ambiente
+npm run build
 
-# Configurar domínio no script
-nano deploy.sh  # Alterar DOMAIN="seudominio.com"
+# Instalar dependências de produção
+npm ci --production
 
-# SSL automático
+# Configurar PM2
+npm install -g pm2
+pm2 start ecosystem.config.js
+
+# Configurar Nginx (exemplo)
+sudo nano /etc/nginx/sites-available/speedroom
+
+# SSL com Certbot
 sudo certbot --nginx -d seudominio.com
 ```
 
@@ -218,31 +224,43 @@ heroku config:set NODE_ENV=production
 
 ```bash
 # Desenvolvimento
-npm run dev              # Frontend + Backend
-npm run dev:frontend     # Apenas frontend
-npm run dev:backend      # Apenas backend
+npm run dev              # Frontend + Backend concorrente
+npm run dev:frontend     # Apenas frontend (Vite)
+npm run dev:backend      # Apenas backend (Nodemon)
 
-# Build
-npm run build           # Build frontend
-npm run start           # Produção
+# Build e Produção
+npm run build           # Build frontend para produção
+npm run start           # Iniciar servidor de produção
+
+# Docker
+npm run docker:dev      # Ambiente de desenvolvimento
+npm run docker:prod     # Deploy em produção
+
+# Testes
+npm run test            # Executar todos os testes
+npm run test:frontend   # Testes do frontend
+npm run test:backend    # Testes do backend
 
 # Utilidades
-npm run lint            # ESLint
+npm run lint            # ESLint no frontend
 npm run clean           # Limpar node_modules
-npm run setup           # Setup completo
+npm run setup           # Setup automático
+npm run generate-admin-hash "senha" # Gerar hash admin
+npm run health-check    # Verificar saúde da aplicação
 ```
 
 ### 🧪 **Testes**
 
 ```bash
-# Executar testes
+# Executar todos os testes
 npm test
 
-# Testes com coverage
-npm run test:coverage
+# Testes por componente
+npm run test:frontend
+npm run test:backend
 
-# Testes E2E
-npm run test:e2e
+# Health check da aplicação
+npm run health-check
 ```
 
 ### 🛠️ **Ferramentas de Desenvolvimento**
