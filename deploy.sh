@@ -9,7 +9,7 @@ echo "🚀 Iniciando deploy do Speed Room..."
 
 # Definir variáveis
 APP_DIR="/var/www/speedroom"
-DOMAIN="seu-dominio.com"  # ALTERE AQUI para seu domínio
+DOMAIN="speedroom.sovxeo.shop"  # ALTERE AQUI para seu domínio
 
 # Verificar se está executando como root
 if [ "$EUID" -ne 0 ]; then

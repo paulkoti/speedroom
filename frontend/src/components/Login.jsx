@@ -1,37 +1,27 @@
-import { useState, memo } from 'react';
-import { API_ENDPOINTS, apiRequest } from '../config/api';
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
-const Login = memo(({ onLogin }) => {
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+const Login = () => {
+  const { login } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('🔄 Attempting login...');
+    
     setLoading(true);
     setError('');
 
-    try {
-      const response = await apiRequest(API_ENDPOINTS.LOGIN, {
-        method: 'POST',
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-      onLogin(data.user);
-    } catch (err) {
-      const errorMessage = err.message.includes('401') ? 'Credenciais inválidas' : 'Erro de conexão. Tente novamente.';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+    const result = await login(username, password);
+    
+    if (!result.success) {
+      setError(result.error || 'Erro no login');
     }
-  };
-
-  const handleChange = (e) => {
-    setCredentials({
-      ...credentials,
-      [e.target.name]: e.target.value
-    });
+    
+    setLoading(false);
   };
 
   return (
@@ -81,8 +71,8 @@ const Login = memo(({ onLogin }) => {
                   type="text"
                   id="username"
                   name="username"
-                  value={credentials.username}
-                  onChange={handleChange}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                   disabled={loading}
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
@@ -98,8 +88,8 @@ const Login = memo(({ onLogin }) => {
                   type="password"
                   id="password"
                   name="password"
-                  value={credentials.password}
-                  onChange={handleChange}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
@@ -110,7 +100,7 @@ const Login = memo(({ onLogin }) => {
 
             <button
               type="submit"
-              disabled={loading || !credentials.username || !credentials.password}
+              disabled={loading || !username || !password}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 text-white py-3 px-6 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:transform-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
@@ -142,22 +132,9 @@ const Login = memo(({ onLogin }) => {
             </div>
           </div>
         </div>
-
-        {/* Development Info */}
-        <div className="mt-4 text-center">
-          <details className="text-xs text-gray-500">
-            <summary className="cursor-pointer hover:text-gray-400">Credenciais de desenvolvimento</summary>
-            <div className="mt-2 bg-gray-800/30 rounded-lg p-3 border border-gray-700/30">
-              <p>Usuário: <code className="text-blue-400">speedroom_admin</code></p>
-              <p>Senha: <code className="text-blue-400">SpeedRoom@Admin2024!</code></p>
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   );
-});
-
-Login.displayName = 'Login';
+};
 
 export default Login;

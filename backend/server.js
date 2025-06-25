@@ -11,7 +11,7 @@ const allowedOrigins = [
   'http://localhost:5174', 
   'http://localhost:5175',
   'http://localhost:5176',
-  'https://speedroom.sovxeo.shop',
+  'http://speedroom.sovxeo.shop', 'https://speedroom.sovxeo.shop',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -48,10 +48,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
+    secure: false,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax'
   }
 }));
 

@@ -1,6 +1,5 @@
 import { useState, useEffect, memo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { API_ENDPOINTS, apiRequest } from '../config/api';
 
 const Dashboard = memo(() => {
   const { logout } = useAuth();
@@ -13,9 +12,14 @@ const Dashboard = memo(() => {
   const fetchStats = async () => {
     try {
       const [statsResponse, perfResponse] = await Promise.all([
-        apiRequest(API_ENDPOINTS.DASHBOARD_STATS),
-        apiRequest(API_ENDPOINTS.PERFORMANCE_METRICS)
+        fetch('/api/dashboard/stats', { credentials: 'include' }),
+        fetch('/api/performance/metrics', { credentials: 'include' })
       ]);
+      
+      if (statsResponse.status === 401 || perfResponse.status === 401) {
+        logout();
+        return;
+      }
       
       const statsData = await statsResponse.json();
       const perfData = await perfResponse.json();
@@ -24,10 +28,7 @@ const Dashboard = memo(() => {
       setPerformance(perfData);
       setError(null);
     } catch (err) {
-      if (err.message.includes('401')) {
-        logout();
-        return;
-      }
+      console.error('Dashboard error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -36,7 +37,9 @@ const Dashboard = memo(() => {
 
   const downloadReport = async (period, format) => {
     try {
-      const response = await apiRequest(`${API_ENDPOINTS.USAGE_REPORTS}?period=${period}&format=${format}`);
+      const response = await fetch(`/api/reports/usage?period=${period}&format=${format}`, {
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         if (response.status === 401) {
@@ -75,7 +78,7 @@ const Dashboard = memo(() => {
 
   useEffect(() => {
     fetchStats();
-    const interval = setInterval(fetchStats, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -111,9 +114,31 @@ const Dashboard = memo(() => {
           <p className="text-red-400 mb-4">Erro: {error}</p>
           <button 
             onClick={fetchStats}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg mr-4"
           >
             Tentar novamente
+          </button>
+          <button 
+            onClick={logout}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats || !stats.global) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-yellow-400 mb-4">Dados não disponíveis</p>
+          <button 
+            onClick={fetchStats}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            Recarregar
           </button>
         </div>
       </div>
@@ -190,138 +215,136 @@ const Dashboard = memo(() => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && (
           <>
-        {/* Global Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Usuários Online</p>
-                <p className="text-2xl font-bold text-white">{stats.global.currentUsers}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-600/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Peak: {stats.global.peakConcurrentUsers}</p>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Salas Ativas</p>
-                <p className="text-2xl font-bold text-white">{stats.global.activeRooms}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-600/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Total: {stats.global.totalRooms}</p>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Sessões Ativas</p>
-                <p className="text-2xl font-bold text-white">{stats.global.activeSessions}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Avg: {stats.global.avgSessionDuration}min</p>
-          </div>
-
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Uptime</p>
-                <p className="text-2xl font-bold text-white">{formatDuration(stats.global.uptime)}</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-600/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">Msgs: {stats.global.totalMessages}</p>
-          </div>
-        </div>
-
-        {/* Active Rooms */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <h2 className="text-lg font-semibold text-white mb-4">Salas Ativas</h2>
-            {stats.rooms.length > 0 ? (
-              <div className="space-y-4">
-                {stats.rooms.map((room) => (
-                  <div key={room.roomId} className="bg-gray-700/50 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-medium text-white">Sala {room.roomId.slice(-8)}</p>
-                        <p className="text-sm text-gray-400">
-                          Criada: {formatTime(room.createdAt)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-green-400">{room.currentParticipants} online</p>
-                        <p className="text-xs text-gray-500">Peak: {room.peakParticipants}</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-sm text-gray-400">
-                      <span>{room.totalMessages} mensagens</span>
-                      <span>{formatDuration(room.totalDuration)}</span>
-                    </div>
+            {/* Global Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Usuários Online</p>
+                    <p className="text-2xl font-bold text-white">{stats.global.currentUsers || 0}</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400 text-center py-8">Nenhuma sala ativa</p>
-            )}
-          </div>
-
-          {/* Recent Sessions */}
-          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
-            <h2 className="text-lg font-semibold text-white mb-4">Sessões Recentes</h2>
-            {stats.recentSessions.length > 0 ? (
-              <div className="space-y-3">
-                {stats.recentSessions.map((session) => (
-                  <div key={session.sessionId} className="bg-gray-700/50 rounded-lg p-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-white">{session.userName}</p>
-                        <p className="text-xs text-gray-400">
-                          Sala {session.roomId.slice(-8)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-blue-400">
-                          {formatDuration(session.duration)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {session.messagesCount} msgs
-                        </p>
-                      </div>
-                    </div>
+                  <div className="w-12 h-12 bg-green-600/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                    </svg>
                   </div>
-                ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Peak: {stats.global.peakConcurrentUsers || 0}</p>
               </div>
-            ) : (
-              <p className="text-gray-400 text-center py-8">Nenhuma sessão recente</p>
-            )}
-          </div>
-        </div>
+
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Salas Ativas</p>
+                    <p className="text-2xl font-bold text-white">{stats.global.activeRooms || 0}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Total: {stats.global.totalRooms || 0}</p>
+              </div>
+
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Sessões Ativas</p>
+                    <p className="text-2xl font-bold text-white">{stats.global.activeSessions || 0}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Avg: {stats.global.avgSessionDuration || 0}min</p>
+              </div>
+
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-400 text-sm">Uptime</p>
+                    <p className="text-2xl font-bold text-white">{formatDuration(stats.global.uptime || 0)}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-600/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Msgs: {stats.global.totalMessages || 0}</p>
+              </div>
+            </div>
+
+            {/* Active Rooms and Recent Sessions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <h2 className="text-lg font-semibold text-white mb-4">Salas Ativas</h2>
+                {stats.rooms && stats.rooms.length > 0 ? (
+                  <div className="space-y-4">
+                    {stats.rooms.map((room, index) => (
+                      <div key={room.roomId || index} className="bg-gray-700/50 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium text-white">Sala {(room.roomId || '').slice(-8)}</p>
+                            <p className="text-sm text-gray-400">
+                              Criada: {formatTime(room.createdAt || Date.now())}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-green-400">{room.currentParticipants || 0} online</p>
+                            <p className="text-xs text-gray-500">Peak: {room.peakParticipants || 0}</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-sm text-gray-400">
+                          <span>{room.totalMessages || 0} mensagens</span>
+                          <span>{formatDuration(room.totalDuration || 0)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 text-center py-8">Nenhuma sala ativa</p>
+                )}
+              </div>
+
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                <h2 className="text-lg font-semibold text-white mb-4">Sessões Recentes</h2>
+                {stats.recentSessions && stats.recentSessions.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.recentSessions.map((session, index) => (
+                      <div key={session.sessionId || index} className="bg-gray-700/50 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-white">{session.userName || 'Usuário'}</p>
+                            <p className="text-xs text-gray-400">
+                              Sala {(session.roomId || '').slice(-8)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-blue-400">
+                              {formatDuration(session.duration || 0)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {session.messagesCount || 0} msgs
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 text-center py-8">Nenhuma sessão recente</p>
+                )}
+              </div>
+            </div>
           </>
         )}
 
         {activeTab === 'reports' && (
           <div className="space-y-6">
-            {/* Reports Header */}
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
               <h2 className="text-xl font-semibold text-white mb-4">Relatórios de Uso</h2>
               <p className="text-gray-400 mb-6">Exporte dados de uso da plataforma em diferentes formatos</p>
@@ -354,7 +377,6 @@ const Dashboard = memo(() => {
               </div>
             </div>
 
-            {/* Quick Stats */}
             {stats && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
@@ -362,15 +384,15 @@ const Dashboard = memo(() => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total de Sessões:</span>
-                      <span className="text-white font-medium">{stats.global.totalSessions}</span>
+                      <span className="text-white font-medium">{stats.global.totalSessions || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total de Salas:</span>
-                      <span className="text-white font-medium">{stats.global.totalRooms}</span>
+                      <span className="text-white font-medium">{stats.global.totalRooms || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total de Mensagens:</span>
-                      <span className="text-white font-medium">{stats.global.totalMessages}</span>
+                      <span className="text-white font-medium">{stats.global.totalMessages || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -380,11 +402,11 @@ const Dashboard = memo(() => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Duração Média:</span>
-                      <span className="text-white font-medium">{stats.global.avgSessionDuration}min</span>
+                      <span className="text-white font-medium">{stats.global.avgSessionDuration || 0}min</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Uptime do Servidor:</span>
-                      <span className="text-white font-medium">{formatDuration(stats.global.uptime)}</span>
+                      <span className="text-white font-medium">{formatDuration(stats.global.uptime || 0)}</span>
                     </div>
                   </div>
                 </div>
@@ -394,11 +416,11 @@ const Dashboard = memo(() => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Usuários Simultâneos:</span>
-                      <span className="text-white font-medium">{stats.global.peakConcurrentUsers}</span>
+                      <span className="text-white font-medium">{stats.global.peakConcurrentUsers || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Usuários Ativos:</span>
-                      <span className="text-white font-medium">{stats.global.currentUsers}</span>
+                      <span className="text-white font-medium">{stats.global.currentUsers || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -409,36 +431,35 @@ const Dashboard = memo(() => {
 
         {activeTab === 'performance' && performance && (
           <div className="space-y-6">
-            {/* Performance Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Memória Usada</h3>
                 <div className="flex items-end gap-2">
-                  <span className="text-2xl font-bold text-white">{performance.application.totalMemoryMB}</span>
+                  <span className="text-2xl font-bold text-white">{performance.application?.totalMemoryMB || 0}</span>
                   <span className="text-gray-400 text-sm">MB</span>
                 </div>
                 <div className="mt-2 bg-gray-700 rounded-full h-2">
                   <div 
                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${performance.application.memoryPercentage}%` }}
+                    style={{ width: `${performance.application?.memoryPercentage || 0}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">{performance.application.memoryPercentage}% do heap</p>
+                <p className="text-xs text-gray-500 mt-1">{performance.application?.memoryPercentage || 0}% do heap</p>
               </div>
 
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Conexões Ativas</h3>
                 <div className="flex items-end gap-2">
-                  <span className="text-2xl font-bold text-white">{performance.application.activeConnections}</span>
+                  <span className="text-2xl font-bold text-white">{performance.application?.activeConnections || 0}</span>
                   <span className="text-gray-400 text-sm">sockets</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Sessões: {performance.application.activeSessions}</p>
+                <p className="text-xs text-gray-500 mt-2">Sessões: {performance.application?.activeSessions || 0}</p>
               </div>
 
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Salas Ativas</h3>
                 <div className="flex items-end gap-2">
-                  <span className="text-2xl font-bold text-white">{performance.application.activeRooms}</span>
+                  <span className="text-2xl font-bold text-white">{performance.application?.activeRooms || 0}</span>
                   <span className="text-gray-400 text-sm">rooms</span>
                 </div>
               </div>
@@ -446,31 +467,30 @@ const Dashboard = memo(() => {
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
                 <h3 className="text-sm font-medium text-gray-400 mb-2">Uptime do Servidor</h3>
                 <div className="text-lg font-bold text-white">
-                  {formatDuration(performance.server.uptime)}
+                  {formatDuration(performance.server?.uptime || 0)}
                 </div>
               </div>
             </div>
 
-            {/* Detailed Metrics */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
                 <h3 className="text-lg font-semibold text-white mb-4">Métricas de Memória</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-400">RSS:</span>
-                    <span className="text-white">{Math.round(performance.server.memory.rss / 1024 / 1024)}MB</span>
+                    <span className="text-white">{Math.round((performance.server?.memory?.rss || 0) / 1024 / 1024)}MB</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Heap Total:</span>
-                    <span className="text-white">{Math.round(performance.server.memory.heapTotal / 1024 / 1024)}MB</span>
+                    <span className="text-white">{Math.round((performance.server?.memory?.heapTotal || 0) / 1024 / 1024)}MB</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Heap Usado:</span>
-                    <span className="text-white">{Math.round(performance.server.memory.heapUsed / 1024 / 1024)}MB</span>
+                    <span className="text-white">{Math.round((performance.server?.memory?.heapUsed || 0) / 1024 / 1024)}MB</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Externa:</span>
-                    <span className="text-white">{Math.round(performance.server.memory.external / 1024 / 1024)}MB</span>
+                    <span className="text-white">{Math.round((performance.server?.memory?.external || 0) / 1024 / 1024)}MB</span>
                   </div>
                 </div>
               </div>
@@ -480,19 +500,19 @@ const Dashboard = memo(() => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total de Sessões:</span>
-                    <span className="text-white">{performance.stats.totalSessions}</span>
+                    <span className="text-white">{performance.stats?.totalSessions || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total de Salas:</span>
-                    <span className="text-white">{performance.stats.totalRooms}</span>
+                    <span className="text-white">{performance.stats?.totalRooms || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Mensagens Totais:</span>
-                    <span className="text-white">{performance.stats.totalMessages}</span>
+                    <span className="text-white">{performance.stats?.totalMessages || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Pico de Usuários:</span>
-                    <span className="text-white">{performance.stats.peakConcurrentUsers}</span>
+                    <span className="text-white">{performance.stats?.peakConcurrentUsers || 0}</span>
                   </div>
                 </div>
               </div>

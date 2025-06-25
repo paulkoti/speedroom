@@ -7,7 +7,10 @@ export const useSocket = () => {
 
   useEffect(() => {
     console.log('Tentando conectar ao servidor...');
-    const newSocket = io('http://localhost:3003');
+    // Para produção: use a URL do seu domínio
+    const newSocket = io(window.location.origin, {
+      transports: ['websocket', 'polling']
+    });
     
     newSocket.on('connect', () => {
       setIsConnected(true);

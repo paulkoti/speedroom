@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { API_ENDPOINTS, apiRequest } from '../config/api';
 
 const AuthContext = createContext();
 
@@ -17,8 +16,12 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await apiRequest(API_ENDPOINTS.CHECK_AUTH);
+      const response = await fetch('/api/auth/check', {
+        credentials: 'include'
+      });
       const data = await response.json();
+      
+      console.log('🔍 Auth check result:', data);
       
       if (data.authenticated) {
         setUser(data.user);
@@ -33,14 +36,35 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = (userData) => {
-    setUser(userData);
+  const login = async (username, password) => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+      console.log('🔑 Login result:', data);
+
+      if (data.success) {
+        setUser(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: 'Credenciais inválidas' };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: 'Erro de conexão' };
+    }
   };
 
   const logout = async () => {
     try {
-      await apiRequest(API_ENDPOINTS.LOGOUT, {
-        method: 'POST'
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
       });
     } catch (error) {
       console.error('Logout failed:', error);

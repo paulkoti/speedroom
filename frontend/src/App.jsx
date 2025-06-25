@@ -17,19 +17,25 @@ function DashboardApp() {
     );
   }
 
-  return user ? <Dashboard /> : <Login onLogin={() => {}} />;
+  return user ? <Dashboard /> : <Login />;
 }
 
 function App() {
-  // Simple routing based on pathname
-  const isDashboard = window.location.pathname === '/dashboard';
+  // Verificar se é acesso direto ao dashboard via URL específica
+  const isDashboard = window.location.pathname === '/dashboard' || 
+                     window.location.pathname === '/admin' ||
+                     window.location.search.includes('admin=true');
   
-  return isDashboard ? (
+  // Se não for dashboard, sempre mostrar VideoCall
+  if (!isDashboard) {
+    return <VideoCall />;
+  }
+
+  // Só permitir dashboard para URLs específicas
+  return (
     <AuthProvider>
       <DashboardApp />
     </AuthProvider>
-  ) : (
-    <VideoCall />
   );
 }
 
