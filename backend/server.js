@@ -42,8 +42,57 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Custom Session Store with TTL to prevent memory leaks
+class CustomSessionStore extends session.Store {
+  constructor() {
+    super();
+    this.sessions = new Map();
+    this.cleanup();
+  }
+  
+  get(sid, callback) {
+    const sessionData = this.sessions.get(sid);
+    if (!sessionData) return callback();
+    
+    // Check if expired
+    if (sessionData.expires && sessionData.expires < Date.now()) {
+      this.sessions.delete(sid);
+      return callback();
+    }
+    
+    callback(null, sessionData.data);
+  }
+  
+  set(sid, session, callback) {
+    const expires = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
+    this.sessions.set(sid, { data: session, expires });
+    callback();
+  }
+  
+  destroy(sid, callback) {
+    this.sessions.delete(sid);
+    callback();
+  }
+  
+  cleanup() {
+    const now = Date.now();
+    for (const [sid, sessionData] of this.sessions.entries()) {
+      if (sessionData.expires && sessionData.expires < now) {
+        this.sessions.delete(sid);
+      }
+    }
+    // Cleanup every 10 minutes
+    setTimeout(() => this.cleanup(), 10 * 60 * 1000);
+  }
+  
+  length(callback) {
+    callback(null, this.sessions.size);
+  }
+}
+
 // Session middleware for dashboard auth
 app.use(session({
+  store: new CustomSessionStore(),
   secret: process.env.SESSION_SECRET || 'speedroom-dashboard-secret-2024',
   resave: false,
   saveUninitialized: false,
@@ -190,7 +239,10 @@ function cleanupOldRoomMetrics() {
 }
 
 function performMemoryCleanup() {
+  const memBefore = process.memoryUsage();
   console.log('🧹 Starting memory cleanup...');
+  console.log(`📊 Heap before: ${Math.round(memBefore.heapUsed/1024/1024)}MB (${Math.round((memBefore.heapUsed/memBefore.heapTotal)*100)}%)`);
+  
   const beforeSessions = sessions.size;
   const beforeRooms = roomMetrics.size;
   
@@ -200,13 +252,16 @@ function performMemoryCleanup() {
   const afterSessions = sessions.size;
   const afterRooms = roomMetrics.size;
   
-  console.log(`🧹 Memory cleanup complete: Sessions ${beforeSessions}→${afterSessions}, Room metrics ${beforeRooms}→${afterRooms}`);
-  
   // Force garbage collection if available
   if (global.gc) {
     global.gc();
     console.log('🧹 Forced garbage collection');
   }
+  
+  const memAfter = process.memoryUsage();
+  console.log(`🧹 Memory cleanup complete: Sessions ${beforeSessions}→${afterSessions}, Room metrics ${beforeRooms}→${afterRooms}`);
+  console.log(`📊 Heap after: ${Math.round(memAfter.heapUsed/1024/1024)}MB (${Math.round((memAfter.heapUsed/memAfter.heapTotal)*100)}%)`);
+  console.log(`💾 Memory freed: ${Math.round((memBefore.heapUsed-memAfter.heapUsed)/1024/1024)}MB`);
 }
 
 function updateGlobalStats() {
@@ -700,11 +755,11 @@ app.post('/api/memory/cleanup', requireAuth, (req, res) => {
   });
 });
 
-// Start memory cleanup interval (every 30 minutes)
-setInterval(performMemoryCleanup, 30 * 60 * 1000);
+// Start memory cleanup interval (every 2 minutes for immediate testing)
+setInterval(performMemoryCleanup, 2 * 60 * 1000);
 
 // Initial cleanup on startup
-setTimeout(performMemoryCleanup, 10000); // Wait 10 seconds after startup
+setTimeout(performMemoryCleanup, 5000); // Wait 5 seconds after startup
 
 const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
