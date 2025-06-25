@@ -314,9 +314,9 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 ## 📞 Suporte
 
 - 📖 **Documentação**: [docs/](docs/)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/seu-usuario/speedroom/issues)
-- 💬 **Discussões**: [GitHub Discussions](https://github.com/seu-usuario/speedroom/discussions)
-- 📧 **Email**: speedroom@seudominio.com
+- 🐛 **Issues**: [GitHub Issues](https://github.com/paulkoti/speedroom/issues)
+- 💬 **Discussões**: [GitHub Discussions](https://github.com/paulkoti/speedroom/discussions)
+- 📧 **Email**: kotipaulo@gmail.com
 
 ---
 
