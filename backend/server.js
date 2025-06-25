@@ -755,11 +755,11 @@ app.post('/api/memory/cleanup', requireAuth, (req, res) => {
   });
 });
 
-// Start memory cleanup interval (every 2 minutes for immediate testing)
-setInterval(performMemoryCleanup, 2 * 60 * 1000);
+// Start memory cleanup interval (every 15 minutes for production)
+setInterval(performMemoryCleanup, 15 * 60 * 1000);
 
 // Initial cleanup on startup
-setTimeout(performMemoryCleanup, 5000); // Wait 5 seconds after startup
+setTimeout(performMemoryCleanup, 10000); // Wait 10 seconds after startup
 
 const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
