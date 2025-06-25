@@ -151,6 +151,64 @@ function endSession(socket) {
   }
 }
 
+// Memory cleanup functions
+function cleanupOldSessions() {
+  const now = Date.now();
+  const MAX_SESSION_AGE = 24 * 60 * 60 * 1000; // 24 hours
+  
+  for (const [sessionId, session] of sessions.entries()) {
+    // Remove sessions older than 24 hours
+    if (session.endTime && (now - session.endTime) > MAX_SESSION_AGE) {
+      sessions.delete(sessionId);
+      console.log(`🧹 Cleaned up old session: ${sessionId}`);
+    }
+    // Remove sessions without endTime that are older than 2 hours (likely orphaned)
+    else if (!session.endTime && (now - session.startTime) > (2 * 60 * 60 * 1000)) {
+      sessions.delete(sessionId);
+      console.log(`🧹 Cleaned up orphaned session: ${sessionId}`);
+    }
+  }
+}
+
+function cleanupOldRoomMetrics() {
+  const now = Date.now();
+  const MAX_ROOM_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+  
+  for (const [roomId, metric] of roomMetrics.entries()) {
+    // Only clean up rooms that no longer exist and are old
+    if (!rooms.has(roomId) && (now - metric.createdAt) > MAX_ROOM_AGE) {
+      // Clean up session references in room metrics
+      metric.sessions = metric.sessions.filter(sessionId => sessions.has(sessionId));
+      
+      // If no active sessions and room is old, remove completely
+      if (metric.sessions.length === 0) {
+        roomMetrics.delete(roomId);
+        console.log(`🧹 Cleaned up old room metrics: ${roomId}`);
+      }
+    }
+  }
+}
+
+function performMemoryCleanup() {
+  console.log('🧹 Starting memory cleanup...');
+  const beforeSessions = sessions.size;
+  const beforeRooms = roomMetrics.size;
+  
+  cleanupOldSessions();
+  cleanupOldRoomMetrics();
+  
+  const afterSessions = sessions.size;
+  const afterRooms = roomMetrics.size;
+  
+  console.log(`🧹 Memory cleanup complete: Sessions ${beforeSessions}→${afterSessions}, Room metrics ${beforeRooms}→${afterRooms}`);
+  
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+    console.log('🧹 Forced garbage collection');
+  }
+}
+
 function updateGlobalStats() {
   const currentUsers = Array.from(io.sockets.sockets.values()).length;
   if (currentUsers > globalStats.peakConcurrentUsers) {
@@ -598,8 +656,59 @@ app.get('/api/performance/metrics', requireAuth, (req, res) => {
   res.json(metrics);
 });
 
+// Memory management API (Protected)
+app.get('/api/memory/stats', requireAuth, (req, res) => {
+  const memUsage = process.memoryUsage();
+  
+  res.json({
+    memory: memUsage,
+    collections: {
+      sessions: sessions.size,
+      roomMetrics: roomMetrics.size,
+      activeRooms: rooms.size,
+      activeSockets: io.sockets.sockets.size
+    },
+    uptime: process.uptime() * 1000,
+    nodeVersion: process.version
+  });
+});
+
+app.post('/api/memory/cleanup', requireAuth, (req, res) => {
+  const before = {
+    sessions: sessions.size,
+    roomMetrics: roomMetrics.size,
+    memory: process.memoryUsage()
+  };
+  
+  performMemoryCleanup();
+  
+  const after = {
+    sessions: sessions.size,
+    roomMetrics: roomMetrics.size,
+    memory: process.memoryUsage()
+  };
+  
+  res.json({
+    success: true,
+    before,
+    after,
+    cleaned: {
+      sessions: before.sessions - after.sessions,
+      roomMetrics: before.roomMetrics - after.roomMetrics,
+      memoryFreed: before.memory.heapUsed - after.memory.heapUsed
+    }
+  });
+});
+
+// Start memory cleanup interval (every 30 minutes)
+setInterval(performMemoryCleanup, 30 * 60 * 1000);
+
+// Initial cleanup on startup
+setTimeout(performMemoryCleanup, 10000); // Wait 10 seconds after startup
+
 const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
   console.log(`Dashboard API disponível em http://localhost:${PORT}/api/dashboard/stats`);
+  console.log(`🧹 Memory cleanup scheduled every 30 minutes`);
 });
